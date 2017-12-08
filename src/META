@@ -1,0 +1,12 @@
+# OASIS_START
+# DO NOT EDIT (digest: 2f1ffe357afc0074b480018d55b74c2b)
+version = "0.0.1"
+description = "A IR library for the Rill programming language"
+requires = "batteries ppx_deriving.std ppx_deriving.show llvm"
+archive(byte) = "rill_ir.cma"
+archive(byte, plugin) = "rill_ir.cma"
+archive(native) = "rill_ir.cmxa"
+archive(native, plugin) = "rill_ir.cmxs"
+exists_if = "rill_ir.cma"
+# OASIS_STOP
+

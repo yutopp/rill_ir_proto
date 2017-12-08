@@ -1,0 +1,29 @@
+# OCaml files
+*.cmi
+*.cmx
+*.cmo
+*.cmt
+*.cma
+*.cmxa
+*.cmxs
+*.annot
+*.log
+*.out
+*.cache
+*.run
+*.mllib
+*.mldylib
+
+# Object files
+*.a
+*.o
+
+# OASIS files
+setup.data
+setup.log
+
+# OMake files
+.omakedb
+.omakedb.lock
+*.omc
+*.om

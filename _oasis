@@ -1,0 +1,18 @@
+OASISFormat: 0.4
+Plugins:     META (0.4), DevFiles (0.4)
+OCamlVersion: >= 4.04.2
+BuildType: OMake (0.4)
+BuildTools:  omake
+
+Name:        rill_ir
+Version:     0.0.1
+Homepage:    https://github.com/yutopp/rill_ir
+Synopsis:    A IR library for the Rill programming language
+Authors:     yutopp
+License:     http://www.boost.org/LICENSE_1_0.txt
+
+Library rill_ir
+  Path: src
+  Findlibname: rill_ir
+  BuildDepends: batteries, ppx_deriving.std, ppx_deriving.show, llvm
+  Modules: Rill_ir
