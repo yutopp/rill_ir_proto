@@ -1,0 +1,35 @@
+lib: [
+  "_build/install/default/lib/rill_ir/META" {"META"}
+  "_build/install/default/lib/rill_ir/opam" {"opam"}
+  "_build/install/default/lib/rill_ir/rill_ir.cmi"
+  "_build/install/default/lib/rill_ir/rill_ir.cmx"
+  "_build/install/default/lib/rill_ir/rill_ir.cmt"
+  "_build/install/default/lib/rill_ir/rill_ir.ml"
+  "_build/install/default/lib/rill_ir/rill_ir_ast.cmi"
+  "_build/install/default/lib/rill_ir/rill_ir_ast.cmx"
+  "_build/install/default/lib/rill_ir/rill_ir_ast.cmt"
+  "_build/install/default/lib/rill_ir/rill_ir_ast.ml"
+  "_build/install/default/lib/rill_ir/rill_ir_id_string.cmi"
+  "_build/install/default/lib/rill_ir/rill_ir_id_string.cmx"
+  "_build/install/default/lib/rill_ir/rill_ir_id_string.cmt"
+  "_build/install/default/lib/rill_ir/rill_ir_id_string.ml"
+  "_build/install/default/lib/rill_ir/rill_ir_ir.cmi"
+  "_build/install/default/lib/rill_ir/rill_ir_ir.cmx"
+  "_build/install/default/lib/rill_ir/rill_ir_ir.cmt"
+  "_build/install/default/lib/rill_ir/rill_ir_ir.ml"
+  "_build/install/default/lib/rill_ir/rill_ir_k_normal.cmi"
+  "_build/install/default/lib/rill_ir/rill_ir_k_normal.cmx"
+  "_build/install/default/lib/rill_ir/rill_ir_k_normal.cmt"
+  "_build/install/default/lib/rill_ir/rill_ir_k_normal.ml"
+  "_build/install/default/lib/rill_ir/rill_ir_type.cmi"
+  "_build/install/default/lib/rill_ir/rill_ir_type.cmx"
+  "_build/install/default/lib/rill_ir/rill_ir_type.cmt"
+  "_build/install/default/lib/rill_ir/rill_ir_type.ml"
+  "_build/install/default/lib/rill_ir/rill_ir.cma"
+  "_build/install/default/lib/rill_ir/rill_ir.cmxa"
+  "_build/install/default/lib/rill_ir/rill_ir.a"
+  "_build/install/default/lib/rill_ir/rill_ir.cmxs"
+]
+doc: [
+  "_build/install/default/doc/rill_ir/README.md"
+]

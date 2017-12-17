@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library
+ ((name rill_ir)
+  (public_name rill_ir)
+  (libraries (batteries llvm llvm_X86 ppx_deriving))
+  (preprocess (pps (ppx_deriving.show)))
+  (synopsis "")))
