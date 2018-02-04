@@ -22,7 +22,7 @@ let initialize_backends =
   let initialize () =
     match !is_initialized with
     | false ->
-       Llvm_X86.initialize ();
+       Llvm_all_backends.initialize ();
        is_initialized := true
     | true ->
        ()

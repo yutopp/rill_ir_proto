@@ -1,8 +1,15 @@
 (jbuild_version 1)
 
+(ocamllex (lexer))
+
+(menhir
+ ((merge_into parser)
+  (modules (tokens parser))
+  (flags (--infer -v --explain))))
+
 (library
  ((name rill_ir)
   (public_name rill_ir)
-  (libraries (batteries llvm llvm_X86 ppx_deriving))
+  (libraries (batteries llvm llvm.all_backends ppx_deriving))
   (preprocess (pps (ppx_deriving.show)))
   (synopsis "")))
