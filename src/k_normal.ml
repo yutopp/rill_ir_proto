@@ -13,7 +13,7 @@ type 'loc t = {kind: 'loc kind_t; ty: Type.t; loc: 'loc}
    | Bool of bool
    | Var of Id_string.t
    | Undef
-       [@@deriving show]
+[@@deriving show]
 
 let insert_let k_form k =
   match k_form with
@@ -31,33 +31,33 @@ let insert_let k_form k =
 
 let rec generate env ast =
   match ast with
-  | Ast.{kind = Module {nodes}; ty; loc} ->
+  | T_ast.{kind = Module {nodes}; ty; loc} ->
      {kind = Module {nodes = List.map (generate env) nodes}; ty; loc}
 
-  | Ast.{kind = Stmts {stmts}; ty; loc} ->
+  | T_ast.{kind = Stmts {stmts}; ty; loc} ->
      {kind = Stmts {stmts = List.map (generate env) stmts}; ty; loc}
 
-  | Ast.{kind = FuncDecl {name; params; body}; ty; loc} ->
+  | T_ast.{kind = FuncDecl {name; params; body}; ty; loc} ->
      let body' = generate env body in
      {kind = FuncDecl {name; params; body = body'}; ty; loc}
 
-  | Ast.{kind = Let {name; expr}; ty; loc} ->
+  | T_ast.{kind = Let {name; expr}; ty; loc} ->
      let expr' = generate env expr in
      {kind = Let {name; expr = expr'}; ty; loc}
 
-  | Ast.{kind = Return e; ty; loc} ->
+  | T_ast.{kind = Return e; ty; loc} ->
      let k = insert_let (generate env e) in
      k (fun e' ->
         {kind = Return e'; ty; loc})
 
-  | Ast.{kind = BinOp {op; lhs; rhs}; ty; loc} ->
+  | T_ast.{kind = BinOp {op; lhs; rhs}; ty; loc} ->
      let k = insert_let (generate env lhs) in
      k (fun lhs' ->
         let k = insert_let (generate env rhs) in
         k (fun rhs' ->
            {kind = BinOp {op; lhs = lhs'; rhs = rhs'}; ty; loc}))
 
-  | Ast.{kind = IfExpr {cond; then_c; else_c}; ty; loc} ->
+  | T_ast.{kind = IfExpr {cond; then_c; else_c}; ty; loc} ->
      let unit_imm = Type.{base = Concrete Unit; mutability = Immutable} in
      let k = insert_let {kind = Undef; ty; loc} in
      k (fun holder' ->
@@ -76,11 +76,11 @@ let rec generate env ast =
            {kind = Seq {nodes = [if_stmt; var]}; ty; loc}
           ))
 
-  | Ast.{kind = Var x; ty; loc} ->
+  | T_ast.{kind = Var x; ty; loc} ->
      {kind = Var x; ty; loc}
 
-  | Ast.{kind = Num n; ty; loc} ->
+  | T_ast.{kind = Num n; ty; loc} ->
      {kind = Num n; ty; loc}
 
-  | Ast.{kind = Bool b; ty; loc} ->
+  | T_ast.{kind = Bool b; ty; loc} ->
      {kind = Bool b; ty; loc}

@@ -1,12 +1,12 @@
 (jbuild_version 1)
 
 (executable
- ((name unit_main)
-  (libraries (rill_ir))
-  (modules (unit_main))))
+ ((name      unit_main)
+  (libraries (rill_ir oUnit))
+  (modules   (unit_main))))
 
 (alias
- ((name runtest)
+ ((name    runtest)
   (package rill_ir)
-  (deps (unit_main.exe))
-  (action (run ${<}))))
+  (deps    (unit_main.exe (glob_files *.rir)))
+  (action  (run ${<}))))

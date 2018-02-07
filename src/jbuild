@@ -3,13 +3,17 @@
 (ocamllex (lexer))
 
 (menhir
+ ((flags   (--only-tokens))
+  (modules (tokens))))
+
+(menhir
  ((merge_into parser)
-  (modules (tokens parser))
-  (flags (--infer -v --explain))))
+  (flags      (--external-tokens Tokens -v --explain))
+  (modules    (tokens parser))))
 
 (library
- ((name rill_ir)
+ ((name        rill_ir)
   (public_name rill_ir)
-  (libraries (batteries llvm llvm.all_backends ppx_deriving))
-  (preprocess (pps (ppx_deriving.show)))
-  (synopsis "")))
+  (libraries   (batteries llvm llvm.all_backends ppx_deriving))
+  (preprocess  (pps (ppx_deriving.show)))
+  (synopsis    "")))
