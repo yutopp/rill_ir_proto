@@ -2,7 +2,7 @@ type 'loc t = {kind: 'loc kind_t; ty: Type.t; loc: 'loc}
  and 'loc kind_t =
    | Module of {nodes: 'loc t list}
    | Seq of {nodes: 'loc t list}
-   | FuncDecl of {name: Id_string.t; params: Id_string.t list; body: 'loc t}
+   | FuncDecl of {name: Id_string.t; params: 'loc t list; body: 'loc t}
    | Stmts of {stmts: 'loc t list}
    | Let of {name: Id_string.t; expr: 'loc t}
    | Assign of {lhs: Id_string.t; rhs: Id_string.t}
@@ -12,6 +12,7 @@ type 'loc t = {kind: 'loc kind_t; ty: Type.t; loc: 'loc}
    | Num of int
    | Bool of bool
    | Var of Id_string.t
+   | DeclParam of Id_string.t
    | Undef
 [@@deriving show]
 
@@ -21,7 +22,7 @@ let insert_let k_form k =
      k id
   | {loc} ->
      let new_id = Id_string.flesh () in
-     let unit_imm = Type.{base = Concrete Unit; mutability = Immutable} in
+     let unit_imm = Type.Builtin.unit in
      let let_stmt = {kind = Let {name = new_id; expr = k_form}; ty = unit_imm; loc} in
      match k new_id with
      | {kind = Seq {nodes}; ty; loc} ->
@@ -31,15 +32,17 @@ let insert_let k_form k =
 
 let rec generate env ast =
   match ast with
-  | T_ast.{kind = Module {nodes}; ty; loc} ->
+  | T_ast.{kind = Module nodes; ty; loc} ->
      {kind = Module {nodes = List.map (generate env) nodes}; ty; loc}
 
   | T_ast.{kind = Stmts {stmts}; ty; loc} ->
      {kind = Stmts {stmts = List.map (generate env) stmts}; ty; loc}
 
   | T_ast.{kind = FuncDecl {name; params; body}; ty; loc} ->
+     let params' = List.map (generate env) params in
      let body' = generate env body in
-     {kind = FuncDecl {name; params; body = body'}; ty; loc}
+
+     {kind = FuncDecl {name; params = params'; body = body'}; ty; loc}
 
   | T_ast.{kind = Let {name; expr}; ty; loc} ->
      let expr' = generate env expr in
@@ -58,7 +61,7 @@ let rec generate env ast =
            {kind = BinOp {op; lhs = lhs'; rhs = rhs'}; ty; loc}))
 
   | T_ast.{kind = IfExpr {cond; then_c; else_c}; ty; loc} ->
-     let unit_imm = Type.{base = Concrete Unit; mutability = Immutable} in
+     let unit_imm = Type.Builtin.unit in
      let k = insert_let {kind = Undef; ty; loc} in
      k (fun holder' ->
         let k = insert_let (generate env cond) in
@@ -84,3 +87,6 @@ let rec generate env ast =
 
   | T_ast.{kind = Bool b; ty; loc} ->
      {kind = Bool b; ty; loc}
+
+  | T_ast.{kind = DeclParam id; ty; loc} ->
+     {kind = DeclParam id; ty; loc}

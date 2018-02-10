@@ -18,20 +18,44 @@ let () =
     assert_equal (Result.is_ok t) true;
     Result.get t
   in
-  let () = tree |> Ast.show |> Printf.printf "%s\n" in
-  let env = Env.empty () in
-  let (typed_tree, env) = Typing.generate env tree in
-  let () = typed_tree |> T_ast.show |> Printf.printf "%s\n" in
+  let () = tree |> Ast.show |> Printf.printf "TREE:\n%s\n" in
 
-  (**)
+  let ctx = Context.empty () in
+  let env = Env.empty () in
+  let (typed_tree, env) = Typing.generate ctx env tree in
+  let () = typed_tree |> T_ast.show |> Printf.printf "TYPED TREE:\n%s\n" in
+  Context.dump_errors ctx;
+  assert_equal false (Context.has_errors ctx);
+
+  let k_form = typed_tree |> K_normal.generate env in
+  let () = k_form |> K_normal.show (Loc.pp) |> Printf.printf "K NORMAL:\n%s\n" in
+
+  let ir_ctx = Ir.make_context () in
+  let rill_module = k_form |> Ir.generate ir_ctx env in
+  let () = rill_module |> Ir.show |> Printf.printf "IR0: %s\n" in
+
+  let rill_module = rill_module |> Ir.complete_pass ir_ctx env in
+  let () = rill_module |> Ir.show |> Printf.printf "IR1: %s\n" in
+
+  let rill_module = rill_module |> Ir.reduce_tmp_vars_pass ir_ctx env in
+  let () = rill_module |> Ir.show |> Printf.printf "IR2: %s\n" in
+
+  let rill_module = rill_module |> Ir.collect_stack_pass ir_ctx env in
+  let () = rill_module |> Ir.show |> Printf.printf "IR3: %s\n" in
+
+  let backend_ctx = Backend.make_context () in
+  let llvm_m = rill_module |> Backend.generate backend_ctx in
+  let () = llvm_m |> Backend.show |> Printf.printf "LLVM: %s\n" in
+
+  (*
   let tree =
     let open T_ast in
     let loc = None in
-    let mod_imm = Type.{base = Concrete Module; mutability = Immutable} in
-    let unit_imm = Type.{base = Concrete Unit; mutability = Immutable} in
-    let i1_imm = Type.{base = Concrete Bool; mutability = Immutable} in
-    let i32_imm = Type.{base = Concrete Int32; mutability = Immutable} in
-    let fun_imm = Type.{base = Concrete (Func ([i32_imm], i32_imm)); mutability = Immutable} in
+    let mod_imm = Type.Builtin.unit in
+    let unit_imm = Type.Builtin.unit in
+    let i1_imm = Type.Builtin.i1 in
+    let i32_imm = Type.Builtin.i32 in
+    let fun_imm = Type.Function ([i32_imm], i32_imm) in
 
     let if_expr =
       let exp_10_20 = {kind = BinOp {op = "+";
@@ -63,8 +87,8 @@ let () =
     let stmts = {kind = Stmts {stmts = [
                                   ret;
                                 ]}; ty = unit_imm; loc} in
-    let func0 = {kind = FuncDecl {name = "f"; params = ["c"]; body = stmts}; ty = fun_imm; loc} in
-    {kind = Module {nodes = [func0]}; ty = mod_imm; loc}
+    let func0 = {kind = FuncDecl {name = "f"; params = [{kind = DeclParam "c"; ty = i32_imm; loc}]; body = stmts}; ty = fun_imm; loc} in
+    {kind = Module [func0]; ty = mod_imm; loc}
   in(*
   let tree =
     let open Ast in
@@ -104,4 +128,5 @@ let () =
   let backend_ctx = Backend.make_context () in
   let llvm_m = rill_module |> Backend.generate backend_ctx in
   let () = llvm_m |> Backend.show |> Printf.printf "%s\n" in
+   *)
   ()

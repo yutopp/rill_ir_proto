@@ -16,3 +16,10 @@ type t = pos option
    pos_end_bol    : int;
  }
 [@@deriving show]
+
+let show_message loc =
+  match loc with
+  | Some pos ->
+     Printf.sprintf "%d:%d" pos.pos_begin_lnum pos.pos_begin_bol
+  | None ->
+     "<unknown>"

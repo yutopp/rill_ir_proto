@@ -12,10 +12,9 @@ type t = {
 }
  and kind =
    | Module of t list
-   | Empty
    | SpecModule of t
    | DefFunc of {id: t; params: t list; body: t}
-   | DeclParam of {id: t; ty: t}
+   | DeclParam of {id: t; ty_spec: t}
    | TypeSpec of t
    | ExprIf of {cond: t; then_c: t; else_c: t option}
    | ExprBlock of t
@@ -26,3 +25,8 @@ type t = {
    | LitInt of {signed: bool; bits: int; value: int}
    | LitUnit
 [@@deriving show]
+
+let string_of_id t =
+  match t with
+  | {kind = Id s} -> s
+  | _             -> failwith "not an id node"

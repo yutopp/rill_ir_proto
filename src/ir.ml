@@ -223,7 +223,11 @@ let rec generate ctx env k_form =
 and generate' ctx env k_form =
   match k_form with
   | K_normal.{kind = FuncDecl {name; params; body}; ty; loc} ->
-     let fv = declare_function (current_module ctx) name params ty in
+     let tmp_params = List.map (function
+                                 | K_normal.{kind = DeclParam s} -> s
+                                 | _ -> failwith "")
+                               params in
+     let fv = declare_function (current_module ctx) name tmp_params ty in
      let () = set_current_function ctx fv in
      let _entry = append_block ctx "" in
      let _ = generate' ctx env body in
@@ -231,7 +235,7 @@ and generate' ctx env k_form =
 
   | K_normal.{kind = Seq {nodes}; ty; loc} ->
      let base =
-       let unit_imm = Type.{base = Concrete Unit; mutability = Immutable} in
+       let unit_imm = Type.Builtin.unit in
        {kind = Unit; ty = unit_imm}
      in
      List.fold_left (fun acc n ->
@@ -240,7 +244,7 @@ and generate' ctx env k_form =
 
   | K_normal.{kind = Stmts {stmts}; loc} ->
      List.iter (fun n -> generate' ctx env n |> ignore) stmts;
-     let unit_imm = Type.{base = Concrete Unit; mutability = Immutable} in
+     let unit_imm = Type.Builtin.unit in
      {kind = Unit; ty = unit_imm}
 
   | K_normal.{kind = Let {name; expr}; ty; loc} ->
@@ -282,12 +286,12 @@ and generate' ctx env k_form =
 
      let () = set_current_bb ctx term_bb in
 
-     let unit_imm = Type.{base = Concrete Unit; mutability = Immutable} in
+     let unit_imm = Type.Builtin.unit in
      {kind = Unit; ty = unit_imm}
 
   | K_normal.{kind = Return e; loc} ->
      let _ = build_ret ctx e in
-     let unit_imm = Type.{base = Concrete Unit; mutability = Immutable} in
+     let unit_imm = Type.Builtin.unit in
      {kind = Unit; ty = unit_imm}
 
   | K_normal.{kind = Var name; ty; loc} ->

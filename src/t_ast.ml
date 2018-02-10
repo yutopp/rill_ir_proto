@@ -12,8 +12,8 @@ type t = {
   loc: Loc.t
 }
  and kind =
-   | Module of {nodes: t list}
-   | FuncDecl of {name: Id_string.t; params: Id_string.t list; body: t}
+   | Module of t list
+   | FuncDecl of {name: Id_string.t; params: t list; body: t}
    | Stmts of {stmts: t list}
    | Let of {name: Id_string.t; expr: t}
    | Return of t
@@ -22,4 +22,5 @@ type t = {
    | Num of int
    | Bool of bool
    | Var of Id_string.t
+   | DeclParam of Id_string.t
 [@@deriving show]

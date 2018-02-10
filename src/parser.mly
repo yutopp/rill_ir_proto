@@ -62,7 +62,7 @@ function_parameter_decl:
     id
     COLON
     type_spec
-    { Ast.DeclParam {id = $1; ty = $3} |> wrap $startpos $endpos }
+    { Ast.DeclParam {id = $1; ty_spec = $3} |> wrap $startpos $endpos }
 
 function_body:
     LBLOCK expression RBLOCK { $2 }
