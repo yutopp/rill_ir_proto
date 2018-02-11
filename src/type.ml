@@ -36,9 +36,6 @@ let fresh =
   let id = ref 0 in
   let f () =
     let next_id = !id in
-
-
-
     incr id;
     Var next_id
   in

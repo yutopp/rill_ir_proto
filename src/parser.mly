@@ -125,7 +125,7 @@ lit_bool:
     KEYWORD_TRUE
     { Ast.LitInt {value = 1; bits = 1; signed = false} |> wrap $startpos $endpos }
   | KEYWORD_FALSE
-    { Ast.LitInt {value = 1; bits = 0; signed = false} |> wrap $startpos $endpos }
+    { Ast.LitInt {value = 0; bits = 1; signed = false} |> wrap $startpos $endpos }
 
 lit_unit:
     LPAREN RPAREN

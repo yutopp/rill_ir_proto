@@ -71,8 +71,12 @@ let rec generate env ast =
              k (fun v' -> {kind = Assign {lhs = holder'; rhs = v'}; ty = unit_imm; loc})
            in
            let else_c_v =
-             let k = insert_let (generate env else_c) in
-             k (fun v' -> {kind = Assign {lhs = holder'; rhs = v'}; ty = unit_imm; loc})
+             match else_c with
+             | Some else_c_node ->
+                let k = insert_let (generate env else_c_node) in
+                k (fun v' -> {kind = Assign {lhs = holder'; rhs = v'}; ty = unit_imm; loc})
+             | None ->
+                {kind = Assign {lhs = holder'; rhs = "unit<TMP>"}; ty = unit_imm; loc}
            in
            let if_stmt = {kind = IfStmt {cond = cond'; then_c = then_c_v; else_c = else_c_v}; ty = unit_imm; loc} in
            let var = {kind = Var holder'; ty; loc} in

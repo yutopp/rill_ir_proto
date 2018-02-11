@@ -18,7 +18,7 @@ type t = {
    | Let of {name: Id_string.t; expr: t}
    | Return of t
    | BinOp of {op: Id_string.t; lhs: t; rhs: t} (* TODO: change to Call *)
-   | IfExpr of {cond: t; then_c: t; else_c: t}
+   | IfExpr of {cond: t; then_c: t; else_c: t option}
    | Num of int
    | Bool of bool
    | Var of Id_string.t

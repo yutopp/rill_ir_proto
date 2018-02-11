@@ -55,7 +55,7 @@ let rec analyze ctx env tree =
   | Ast.{kind = DefFunc {id; params; body}; loc} ->
      let id_s = Ast.string_of_id id in
 
-     let ty =
+     let pre_func_ty =
        Env.find_venv id_s env
        |> Option.default_delayed (error_with_exn ctx (Error.Not_found id_s) id.Ast.loc)
      in
@@ -70,6 +70,8 @@ let rec analyze ctx env tree =
 
      let param_tys = new_params |> List.map (fun p -> p.T_ast.ty) in
      let func_ty = Type.Function (param_tys, Type.Builtin.unit) in
+
+     let ty = func_ty in
      (* TODO: unify *)
 
      let (new_body, _) = analyze ctx env body in
@@ -87,9 +89,38 @@ let rec analyze ctx env tree =
 
      (T_ast.{kind = DeclParam id_s; ty; loc}, env)
 
+  | Ast.{kind = ExprIf {cond; then_c; else_c}; loc} ->
+     let (new_cond, env') = analyze ctx env cond in
+     let new_then_c = then_c |> analyze ctx  env' |> fst in
+     let new_else_c = else_c |> Option.map (analyze ctx  env' %> fst) in
+     let ty = match new_else_c with
+       | Some else_c_node ->
+          (* TODO: unify *)
+          new_then_c.T_ast.ty
+       | None ->
+          (* TODO: check else clause *)
+          new_then_c.T_ast.ty
+     in
+     (T_ast.{kind = IfExpr {cond = new_cond; then_c = new_then_c; else_c = new_else_c}; ty; loc}, env)
+
+  | Ast.{kind = ExprBlock e; loc} ->
+     let new_e = analyze ctx env e |> fst in
+     (* TODO: add scope *)
+     (new_e, env)
+
   | Ast.{kind = LitInt {value; bits; signed}; loc} ->
      let ty = Type.Primitive (Int {bits; signed}) in
      (T_ast.{kind = Num value; ty; loc}, env)
+
+  | Ast.{kind = Var id; loc} ->
+     let id_s = Ast.string_of_id id in
+
+     let ty =
+       Env.find_venv id_s env
+       |> Option.default_delayed (error_with_exn ctx (Error.Not_found id_s) id.Ast.loc)
+     in
+
+     (T_ast.{kind = Var id_s; ty; loc}, env)
 
   | _ ->
      failwith (Printf.sprintf "ANALYZER: %s" (Ast.show tree))

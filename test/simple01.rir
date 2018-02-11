@@ -1,10 +1,5 @@
 module "simple01"
 
-def f(c: i32) {
+def main() {
     10
-//    if false {
-//        10 + 20 + c
-//    } else {
-//        500
-//    }
 }
