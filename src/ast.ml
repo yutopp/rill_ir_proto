@@ -13,7 +13,7 @@ type t = {
  and kind =
    | Module of t list
    | SpecModule of t
-   | DefFunc of {id: t; params: t list; body: t}
+   | DefFunc of {id: t; params: t list; ret_spec: t; body: t}
    | DeclParam of {id: t; ty_spec: t}
    | TypeSpec of t
    | ExprIf of {cond: t; then_c: t; else_c: t option}

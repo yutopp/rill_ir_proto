@@ -1,5 +1,5 @@
 module "simple01"
 
-def main() {
+def main() i32 {
     10
 }

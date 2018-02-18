@@ -173,11 +173,8 @@ and generate_value ~recv_var ctx m env ir_value =
      in
      f
 
-  | {kind = IntValue v} ->
-     L.const_int (L.i32_type ctx.llcontext) v
-
-  | {kind = BoolValue b} ->
-     L.const_int (L.i1_type ctx.llcontext) (if b then 1 else 0)
+  | {kind = IntValue v; ty} ->
+     L.const_int (ll_of_ty ctx ty) v
 
   | {kind = UndefValue} ->
      (* FIX *)
@@ -258,11 +255,16 @@ and generater_terminator ctx m env bb_env terminator =
 
   | Ir.Ret e ->
      let {ll; sto} = Map.find e env in
-     let term = match ll with
-       | Some llv ->
+     let term = match (ll, sto) with
+       | (Some llv, StoImm) ->
           L.build_ret llv ctx.llbuilder
-       | None ->
+       | (Some llv, StoStack) ->
+          let llv = L.build_load llv "" ctx.llbuilder in
+          L.build_ret llv ctx.llbuilder
+       | (None, _) ->
           L.build_ret_void ctx.llbuilder
+       | _ ->
+          failwith "[ICE]"
      in
      term
 

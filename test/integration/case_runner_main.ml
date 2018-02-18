@@ -12,7 +12,7 @@ let run_test filename =
   let open Rill_ir in
   let tree =
     let t = Syntax.make_ast_from_file filename in
-    (*assert_equal (Result.is_ok t) true;*)
+    assert (Result.is_ok t);
     Result.get t
   in
   let () = tree |> Ast.show |> Printf.printf "TREE:\n%s\n" in
@@ -22,7 +22,7 @@ let run_test filename =
   let (typed_tree, env) = Typing.generate ctx env tree in
   let () = typed_tree |> T_ast.show |> Printf.printf "TYPED TREE:\n%s\n" in
   Context.get_errors ctx |> List.map Error_msg.to_msg |> List.iter (Printf.printf "%s\n");
-  (*assert_equal false (Context.has_errors ctx);  *)
+  assert (not (Context.has_errors ctx));
 
   let k_form = typed_tree |> K_normal.generate env in
   let () = k_form |> K_normal.show |> Printf.printf "K NORMAL:\n%s\n" in

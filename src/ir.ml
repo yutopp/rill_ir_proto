@@ -16,7 +16,6 @@ type basic_block_t = {
  and value_kind_t =
    | Function of function_t * vars_t
    | IntValue of int
-   | BoolValue of bool
    | UndefValue
    | Call of string * string list
    | Var of string
@@ -254,9 +253,6 @@ and generate' ctx env k_form =
 
   | K_normal.{kind = Num n; ty; loc} ->
      {kind = IntValue n; ty}
-
-  | K_normal.{kind = Bool b; ty; loc} ->
-     {kind = BoolValue b; ty}
 
   | K_normal.{kind = Unit; ty; loc} ->
      {kind = UndefValue; ty}
@@ -541,9 +537,6 @@ and show_value_impl buf i v =
 
   | {kind = IntValue n} ->
      p "INT %d" n
-
-  | {kind = BoolValue b} ->
-     p "BOOL %b" b
 
   | {kind = UndefValue} ->
      p "UNDEF"

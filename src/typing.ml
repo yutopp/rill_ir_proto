@@ -9,6 +9,7 @@
 open Batteries
 
 exception Type_mismatch of {expect: Type.t; actual: Type.t}
+exception Type_not_found of string
 exception Variable_not_found of string
 
 let type_check ~expect ~actual ctx loc =
@@ -16,8 +17,23 @@ let type_check ~expect ~actual ctx loc =
     let e = Type_mismatch {expect; actual} in
     Context.escape_with_error ctx e loc
 
-let rec find_type env tree =
-  Type.Builtin.i1
+let rec find_type ctx env tree =
+  match tree with
+  | Ast.{kind = TypeSpec id} ->
+     begin
+       let id_s = Ast.string_of_id id in
+       match Env.find_tenv id_s env with
+       | Some ty -> ty
+       | None    -> Context.escape_with_error ctx (Type_not_found id_s) id.Ast.loc
+     end
+  | _ ->
+     failwith "TYP"
+
+let find_var ctx env tree =
+  let id_s = Ast.string_of_id tree in
+  match Env.find_venv id_s env with
+  | Some v -> v
+  | None   -> Context.escape_with_error ctx (Variable_not_found id_s) tree.Ast.loc
 
 let rec pre_collect_types pre_env tree =
   match tree with
@@ -27,6 +43,11 @@ let rec pre_collect_types pre_env tree =
   | _ ->
      pre_env
 
+let guard_escape rec_fun ctx env tree =
+  match rec_fun ctx env tree with
+  | v -> v
+  | exception Context.Escape -> env
+
 let rec collect_toplevel_types env tree =
   match tree with
   | Ast.{kind = Module stmts} ->
@@ -35,24 +56,22 @@ let rec collect_toplevel_types env tree =
   | _ ->
      env
 
-let rec collect_toplevel_functions env tree =
+let rec collect_toplevel_functions ctx env tree =
   match tree with
   | Ast.{kind = Module stmts} ->
-     List.fold_left collect_toplevel_functions env stmts
+     List.fold_left (guard_escape collect_toplevel_functions ctx) env stmts
 
-  | Ast.{kind = DefFunc {id; params}} ->
+  | Ast.{kind = DefFunc {id; params; ret_spec}} ->
      let param_tys =
-       params
-       |> List.map (fun p ->
-                    match p with
-                    | Ast.{kind = DeclParam {ty_spec}; loc} ->
-                       let ty = find_type env ty_spec in
-                       ty
-                    | _ ->
-                       failwith "[ICE] not DeclParam"
-                   )
+       List.map (function
+                  | Ast.{kind = DeclParam {ty_spec}; loc} ->
+                     let ty = find_type ctx env ty_spec in
+                     ty
+                  | _ ->
+                     failwith "[ICE] not DeclParam"
+                ) params
      in
-     let ret_ty = Type.Builtin.unit in
+     let ret_ty = find_type ctx env ret_spec in
      let func_ty = Type.Function (param_tys, ret_ty) in
 
      let id_s = Ast.string_of_id id in
@@ -79,10 +98,7 @@ let rec analyze ctx env tree =
   | Ast.{kind = DefFunc {id; params; body}; loc} ->
      let id_s = Ast.string_of_id id in
 
-     let ty = match Env.find_venv id_s env with
-       | Some v -> v
-       | None   -> Context.escape_with_error ctx (Variable_not_found id_s) id.Ast.loc
-     in
+     let ty = find_var ctx env id in
      let (_param_tys, ret_ty) = Type.as_func ty in
 
      let (new_params_rev, env) =
@@ -102,7 +118,7 @@ let rec analyze ctx env tree =
      (T_ast.{kind = FuncDecl {name = id_s; params = new_params; body = ret_body}; ty; loc}, env)
 
   | Ast.{kind = DeclParam {id; ty_spec}; loc} ->
-     let ty = find_type env ty_spec in
+     let ty = find_type ctx env ty_spec in
 
      let id_s = Ast.string_of_id id in
      let env = Env.add_venv (Ast.string_of_id id) ty env in
@@ -149,11 +165,7 @@ let rec analyze ctx env tree =
   | Ast.{kind = Var id; loc} ->
      let id_s = Ast.string_of_id id in
 
-     let ty =
-       match Env.find_venv id_s env with
-       | Some v -> v
-       | None   -> Context.escape_with_error ctx (Variable_not_found id_s) id.Ast.loc
-     in
+     let ty = find_var ctx env id in
 
      (T_ast.{kind = Var id_s; ty; loc}, env)
 
@@ -161,11 +173,12 @@ let rec analyze ctx env tree =
      failwith (Printf.sprintf "ANALYZER: %s" (Ast.show tree))
 
 let add_primitive_types env =
+  let env = Env.add_tenv "unit" Type.Builtin.unit env in
   let env = Env.add_tenv "i32" Type.Builtin.i32 env in
   env
 
 let rec generate ctx env tree =
   let env = add_primitive_types env in
   let env = collect_toplevel_types env tree in
-  let env = collect_toplevel_functions env tree in
+  let env = collect_toplevel_functions ctx env tree in
   analyze ctx env tree

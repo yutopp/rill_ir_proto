@@ -13,7 +13,6 @@ type t = {
    | Return of Id_string.t
    | IfStmt of {cond: Id_string.t; then_c: t; else_c: t}
    | Num of int
-   | Bool of bool
    | Unit
    | Var of Id_string.t
    | DeclParam of Id_string.t
@@ -101,9 +100,6 @@ let rec generate env ast =
 
   | T_ast.{kind = Num n; ty; loc} ->
      {kind = Num n; ty; loc}
-
-  | T_ast.{kind = Bool b; ty; loc} ->
-     {kind = Bool b; ty; loc}
 
   | T_ast.{kind = Unit; ty; loc} ->
      {kind = Unit; ty; loc}

@@ -49,8 +49,9 @@ definition_function:
     KEYWORD_DEF
     id
     function_parameter_list
+    function_ret_type
     function_body
-    { Ast.DefFunc {id = $2; params = $3; body = $4} |> wrap $startpos $endpos }
+    { Ast.DefFunc {id = $2; params = $3; ret_spec = $4; body = $5} |> wrap $startpos $endpos }
 
 function_parameter_list:
     LPAREN
@@ -63,6 +64,10 @@ function_parameter_decl:
     COLON
     type_spec
     { Ast.DeclParam {id = $1; ty_spec = $3} |> wrap $startpos $endpos }
+
+function_ret_type:
+    { Ast.TypeSpec (Ast.Id "unit" |> wrap $startpos $endpos) |> wrap $startpos $endpos }
+  | type_spec { $1 }
 
 function_body:
     expression_block { $1 }
