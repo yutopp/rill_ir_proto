@@ -19,6 +19,7 @@ type t = {
    | ExprIf of {cond: t; then_c: t; else_c: t option}
    | ExprBlock of t
    | ExprBinOp of {op: string; lhs: t; rhs: t}
+   | ExprCall of {func: t; args: t list}
    | Var of t
    | Id of string
    | LitString of string

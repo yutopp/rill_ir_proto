@@ -19,7 +19,9 @@ type t = {
    | Return of t
    | BinOp of {op: Id_string.t; lhs: t; rhs: t} (* TODO: change to Call *)
    | IfExpr of {cond: t; then_c: t; else_c: t option}
+   | ExprCall of {func: t; args: t list}
    | Num of int
+   | Unit
    | Bool of bool
    | Var of Id_string.t
    | DeclParam of Id_string.t

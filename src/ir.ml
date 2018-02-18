@@ -2,12 +2,16 @@ open Batteries
 
 module VarsMap = Map.Make(String)
 
+type mut =
+  | MutVar
+  | MutImm
+
 type basic_block_t = {
   index: basic_block_index_t;
   mutable insts: inst_t Vect.t;
   mutable terminator: terminator_t option;
 }
- and vars_t = (Type.t * bool) VarsMap.t
+ and vars_t = (Type.t * mut) VarsMap.t
  and value_t = {kind: value_kind_t; ty: Type.t}
  and value_kind_t =
    | Function of function_t * vars_t
@@ -223,11 +227,13 @@ let rec generate ctx env k_form =
 and generate' ctx env k_form =
   match k_form with
   | K_normal.{kind = FuncDecl {name; params; body}; ty; loc} ->
-     let tmp_params = List.map (function
-                                 | K_normal.{kind = DeclParam s} -> s
-                                 | _ -> failwith "")
-                               params in
-     let fv = declare_function (current_module ctx) name tmp_params ty in
+     let param_names =
+       List.map (function
+                  | K_normal.{kind = DeclParam s} -> s
+                  | _ -> failwith "[ICE]"
+                ) params
+     in
+     let fv = declare_function (current_module ctx) name param_names ty in
      let () = set_current_function ctx fv in
      let _entry = append_block ctx "" in
      let _ = generate' ctx env body in
@@ -242,23 +248,18 @@ and generate' ctx env k_form =
                      generate' ctx env n
                     ) base nodes
 
-  | K_normal.{kind = Stmts {stmts}; loc} ->
-     List.iter (fun n -> generate' ctx env n |> ignore) stmts;
-     let unit_imm = Type.Builtin.unit in
-     {kind = Unit; ty = unit_imm}
-
   | K_normal.{kind = Let {name; expr}; ty; loc} ->
      let expr_v = generate' ctx env expr in
      build_let ctx name expr_v
-
-  | K_normal.{kind = BinOp {op; lhs; rhs}; ty; loc} ->
-     build_call ctx "" {kind = (Call (op, [lhs; rhs])); ty}
 
   | K_normal.{kind = Num n; ty; loc} ->
      {kind = IntValue n; ty}
 
   | K_normal.{kind = Bool b; ty; loc} ->
      {kind = BoolValue b; ty}
+
+  | K_normal.{kind = Unit; ty; loc} ->
+     {kind = UndefValue; ty}
 
   | K_normal.{kind = Undef; ty; loc} ->
      {kind = UndefValue; ty}
@@ -299,6 +300,9 @@ and generate' ctx env k_form =
 
   | K_normal.{kind = Assign {lhs; rhs}; ty; loc} ->
      build_assign ctx lhs rhs ty
+
+  | K_normal.{kind = Call {name; args}; ty; loc} ->
+     build_call ctx "" {kind = (Call (name, args)); ty}
 
   | _ ->
      failwith "not supprted k form"
@@ -422,38 +426,38 @@ and reduce_tmp_vars_pass' _ctx _env ir =
        let rec replace s =
          match Map.find s assign_m with
          | exception Not_found -> s
-                   | s -> replace s
-                     in
-                     map (fun bb ->
-                          let insts' =
-                            Vect.foldi
-                              (fun index acc i ->
-                               let i' =
-                                 match i with
-                                 | Let (name, value) ->
-                                    let replaced = name |> replace in
-                                    if name != replaced then
-                                      Assign (replaced, value)
-                                    else
-                                      Let (replaced, value)
-                                 | Assign _
-                                 | Nop ->
-                                    Nop
-                               in
-                               Vect.set acc index i'
-                              ) bb.insts bb.insts
-                          in
-                          let terminator' =
-                            bb.terminator
-                          in
-                          {bb with insts = insts'; terminator = terminator'}
-                         ) basic_blocks
-                     in
+         | s -> replace s
+       in
+       map (fun bb ->
+            let insts' =
+              Vect.foldi
+                (fun index acc i ->
+                 let i' =
+                   match i with
+                   | Let (name, value) ->
+                      let replaced = name |> replace in
+                      if name != replaced then
+                        Assign (replaced, value)
+                      else
+                        Let (replaced, value)
+                   | Assign _
+                   | Nop ->
+                      Nop
+                 in
+                 Vect.set acc index i'
+                ) bb.insts bb.insts
+            in
+            let terminator' =
+              bb.terminator
+            in
+            {bb with insts = insts'; terminator = terminator'}
+           ) basic_blocks
+     in
 
-                     let f' = {
-                       f with basic_blocks
-                     } in
-                     {kind = Function (f', vars); ty}
+     let f' = {
+       f with basic_blocks
+     } in
+     {kind = Function (f', vars); ty}
                    | _ ->
                       failwith ""
 
@@ -474,13 +478,13 @@ and collect_stack_pass' ctx env ir =
                (fun m inst ->
                 match inst with
                 | Let (name, value) when not (VarsMap.mem name m) ->
-                   let (ty, must_stack) = match value with
+                   let (ty, mut) = match value with
                      | {kind = UndefValue; ty} ->
-                        (ty, true)
+                        (ty, MutVar) (* value which will be assigned later *)
                      | {ty} ->
-                        (ty, false)
+                        (ty, MutImm)
                    in
-                   VarsMap.add name (ty, must_stack) m
+                   VarsMap.add name (ty, mut) m
                 | _ ->
                    m
                ) macc bb.insts
@@ -510,10 +514,12 @@ and show_value_impl buf i v =
   let p ?(i=i) fmt = Format.bprintf buf ("%s" ^^ fmt) (String.repeat " " (i*2)) in
   match v with
   | {kind = Function (f, v)} ->
-     p "Function\n";
+
      let {
+       name;
        basic_blocks;
      } = f in
+     p "Function: %s\n" name;
      Vect.iter (fun bb ->
                 let {
                   index;
@@ -552,7 +558,7 @@ and show_inst_impl buf i inst =
   let p ?(i=i) fmt = Format.bprintf buf ("%s" ^^ fmt) (String.repeat " " (i*2)) in
   match inst with
   | Let (name, value) ->
-     p "Let %s = " name;
+     p "Let %s: %s = " name (Type.show value.ty);
      show_value_impl buf 0 value;
      Format.bprintf buf (";\n")
   | Assign (name, value) ->

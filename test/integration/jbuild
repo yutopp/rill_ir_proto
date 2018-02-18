@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(executable
+ ((name      case_runner_main)
+  (libraries (rill_ir))
+  (modules   (case_runner_main))))
+
+(alias
+ ((name    runtest)
+  (package rill_ir)
+  (deps    (case_runner_main.exe (glob_files *.rir)))
+  (action  (run ${<}))))

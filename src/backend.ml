@@ -1,9 +1,15 @@
 open Batteries
 module L = Llvm
 
+type t = {
+  llmodule: Llvm.llmodule
+}
+
 type storage_t =
   | StoImm
   | StoStack
+  | StoIgnore
+[@@deriving show]
 
 type env_value_t = {ll: L.llvalue option; sto: storage_t}
 
@@ -13,9 +19,6 @@ type context_t = {
   llcontext: L.llcontext;
   llbuilder: L.llbuilder;
 }
-
-let is_stack_type ty =
-  false
 
 let initialize_backends =
   let is_initialized = ref false in
@@ -28,6 +31,23 @@ let initialize_backends =
        ()
   in
   initialize
+
+let is_stack_type ty =
+  false
+
+let rec ll_of_ty ctx ty =
+  let llctx = ctx.llcontext in
+  match ty with
+  | Type.Primitive (Int {bits}) ->
+     L.integer_type llctx bits
+  | Type.Primitive Unit ->
+     L.void_type llctx
+  | Type.Function (param_tys, ret_ty) ->
+     let param_ll_tys = param_tys |> List.map (ll_of_ty ctx) in
+     let ret_ll_ty = ret_ty |> ll_of_ty ctx in
+     L.function_type ret_ll_ty (param_ll_tys |> Array.of_list)
+  | _ ->
+     failwith "[ICE] not supported type"
 
 let make_context () =
   let () = initialize_backends () in
@@ -52,20 +72,19 @@ let rec generate ctx ir_module =
   List.iter (fun f ->
              generate_value ~recv_var:"" ctx m env f |> ignore
             ) functions;
-  m
+  {
+    llmodule = m
+  }
 
 and generate_global_interfaces ctx m env ir_value =
   let open Ir in
   match ir_value with
-  | {kind = Function ({name; params; _}, _vars)} ->
-     let param_tys = params |> List.map (fun _p -> L.i32_type ctx.llcontext) in
-     let ret_ty = L.i32_type ctx.llcontext in
-     let fty = L.function_type ret_ty (param_tys |> Array.of_list) in
+  | {kind = Function ({name; params; _}, _vars); ty} ->
+     Printf.printf "FUNC=%s\n" name;
+     let fty = ll_of_ty ctx ty in
 
-     let f = L.declare_function "" fty m in
-     List.iter2 (fun lp p ->
-                 L.set_value_name p lp
-                ) (L.params f |> Array.to_list) params;
+     let f = L.declare_function name fty m in
+     List.iter2 L.set_value_name params (L.params f |> Array.to_list);
 
      let ev = {ll = Some f; sto = StoImm} in
      Map.add name ev env
@@ -94,18 +113,20 @@ and generate_value ~recv_var ctx m env ir_value =
      let env =
        VarsMap.fold
          (fun k v acc ->
-          let is_stack = match v with
-            | (_, true) -> true
-            | (ty, _) -> is_stack_type ty
+          let storage = match v with
+            | (Type.Primitive Unit, _) -> StoIgnore (* unit will not be exported to executable *)
+            | (_, Ir.MutVar) -> StoStack
+            | (ty, Ir.MutImm) when is_stack_type ty -> StoStack
+            | (_ , Ir.MutImm) -> StoImm
           in
-          Printf.printf "VAR %s, is_stack=%b\n" k is_stack;
-          let ev = match is_stack with
-            | true ->
+          Printf.printf "VAR %s, storage=%s\n" k (show_storage_t storage);
+          let ev = match storage with
+            | StoStack ->
                let llty = L.i32_type ctx.llcontext in
                let llv = L.build_alloca llty k ctx.llbuilder in
-               {ll = Some llv; sto = StoStack}
-            | false ->
-               {ll = None; sto = StoImm}
+               {ll = Some llv; sto = storage}
+            | _ ->
+               {ll = None; sto = storage}
           in
           Map.add k ev acc
          ) vars env
@@ -171,7 +192,11 @@ and generate_value ~recv_var ctx m env ir_value =
      L.build_add lhs_v rhs_v "" ctx.llbuilder
 
   | {kind = Call (func_name, arg_names)} ->
-     failwith ""
+     Printf.printf "FIND=%s\n" func_name;
+     let {ll; sto} = Map.find func_name env in
+     let lhs_v = Option.get ll in
+
+     L.build_call lhs_v [||] "" ctx.llbuilder
 
   | {kind = Var (var_name)} ->
      let {ll; sto} = Map.find var_name env in
@@ -183,12 +208,12 @@ and generate_value ~recv_var ctx m env ir_value =
 and generate_inst ctx m env inst =
   match inst with
   | Ir.Let (name, v) ->
-     Printf.printf "LET %s\n" name;
      let {ll; sto} = Map.find name env in
+     Printf.printf "LET %s: %s\n" name (show_storage_t sto);
      let llvalue = generate_value ~recv_var:name ctx m env v in
-     L.set_value_name name llvalue;
      let ret = match sto with
        | StoImm ->
+          L.set_value_name name llvalue;
           let ev = {ll = Some llvalue; sto = StoImm} in
           let next_env = Map.add name ev env in
           Some (llvalue, next_env)
@@ -196,6 +221,8 @@ and generate_inst ctx m env inst =
           let recv_v = Option.get ll in
           let st = L.build_store llvalue recv_v ctx.llbuilder in
           Some (st, env)
+       | StoIgnore ->
+          None
      in
      ret
   | Ir.Assign (name, v) ->
@@ -209,6 +236,8 @@ and generate_inst ctx m env inst =
           let recv_v = Option.get ll in
           let st = L.build_store llvalue recv_v ctx.llbuilder in
           Some (st, env)
+       | StoIgnore ->
+          None
      in
      ret
   | Ir.Nop ->
@@ -229,8 +258,18 @@ and generater_terminator ctx m env bb_env terminator =
 
   | Ir.Ret e ->
      let {ll; sto} = Map.find e env in
-     let llv = Option.get ll in
-     L.build_ret llv ctx.llbuilder
+     let term = match ll with
+       | Some llv ->
+          L.build_ret llv ctx.llbuilder
+       | None ->
+          L.build_ret_void ctx.llbuilder
+     in
+     term
 
 let show m =
-  L.string_of_llmodule m
+  let {llmodule} = m in
+  L.string_of_llmodule llmodule
+
+let validate m =
+  let {llmodule} = m in
+  Llvm_analysis.verify_module llmodule

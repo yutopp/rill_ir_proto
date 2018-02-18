@@ -1,16 +1,20 @@
-type 'loc t = {kind: 'loc kind_t; ty: Type.t; loc: 'loc}
- and 'loc kind_t =
-   | Module of {nodes: 'loc t list}
-   | Seq of {nodes: 'loc t list}
-   | FuncDecl of {name: Id_string.t; params: 'loc t list; body: 'loc t}
-   | Stmts of {stmts: 'loc t list}
-   | Let of {name: Id_string.t; expr: 'loc t}
+type t = {
+  kind: kind;
+  ty: Type.t;
+  loc: Loc.t
+}
+ and kind =
+   | Module of {nodes: t list}
+   | FuncDecl of {name: Id_string.t; params: t list; body: t}
+   | Seq of {nodes: t list}
+   | Let of {name: Id_string.t; expr: t}
+   | Call of {name: Id_string.t; args: Id_string.t list}
    | Assign of {lhs: Id_string.t; rhs: Id_string.t}
    | Return of Id_string.t
-   | IfStmt of {cond: Id_string.t; then_c: 'loc t; else_c: 'loc t}
-   | BinOp of {op: Id_string.t; lhs: Id_string.t; rhs: Id_string.t}
+   | IfStmt of {cond: Id_string.t; then_c: t; else_c: t}
    | Num of int
    | Bool of bool
+   | Unit
    | Var of Id_string.t
    | DeclParam of Id_string.t
    | Undef
@@ -22,21 +26,17 @@ let insert_let k_form k =
      k id
   | {loc} ->
      let new_id = Id_string.flesh () in
-     let unit_imm = Type.Builtin.unit in
-     let let_stmt = {kind = Let {name = new_id; expr = k_form}; ty = unit_imm; loc} in
+     let let_stmt = {kind = Let {name = new_id; expr = k_form}; ty = Type.Builtin.unit; loc} in
      match k new_id with
      | {kind = Seq {nodes}; ty; loc} ->
         {kind = Seq {nodes = let_stmt :: nodes}; ty; loc}
-     | {ty} as node ->
+     | {ty; loc} as node ->
         {kind = Seq {nodes = [let_stmt; node]}; ty; loc}
 
 let rec generate env ast =
   match ast with
   | T_ast.{kind = Module nodes; ty; loc} ->
      {kind = Module {nodes = List.map (generate env) nodes}; ty; loc}
-
-  | T_ast.{kind = Stmts {stmts}; ty; loc} ->
-     {kind = Stmts {stmts = List.map (generate env) stmts}; ty; loc}
 
   | T_ast.{kind = FuncDecl {name; params; body}; ty; loc} ->
      let params' = List.map (generate env) params in
@@ -58,7 +58,7 @@ let rec generate env ast =
      k (fun lhs' ->
         let k = insert_let (generate env rhs) in
         k (fun rhs' ->
-           {kind = BinOp {op; lhs = lhs'; rhs = rhs'}; ty; loc}))
+           {kind = Call {name = op; args = [lhs'; rhs']}; ty; loc}))
 
   | T_ast.{kind = IfExpr {cond; then_c; else_c}; ty; loc} ->
      let unit_imm = Type.Builtin.unit in
@@ -83,6 +83,19 @@ let rec generate env ast =
            {kind = Seq {nodes = [if_stmt; var]}; ty; loc}
           ))
 
+  | T_ast.{kind = ExprCall {func = T_ast.{kind = Var f}; args}; ty; loc} ->
+     let rec bind xs args =
+       match args with
+       | [] -> {kind= Call {name=f; args = List.rev xs}; ty; loc}
+       | a :: args ->
+          let k = insert_let (generate env a) in
+          k (fun k -> bind (k :: xs) args)
+     in
+     bind [] args
+
+  | T_ast.{kind = ExprCall {func; args}; ty; loc} ->
+     failwith ""
+
   | T_ast.{kind = Var x; ty; loc} ->
      {kind = Var x; ty; loc}
 
@@ -92,5 +105,11 @@ let rec generate env ast =
   | T_ast.{kind = Bool b; ty; loc} ->
      {kind = Bool b; ty; loc}
 
+  | T_ast.{kind = Unit; ty; loc} ->
+     {kind = Unit; ty; loc}
+
   | T_ast.{kind = DeclParam id; ty; loc} ->
      {kind = DeclParam id; ty; loc}
+
+  | _ ->
+     failwith "[ICE] not supported node"

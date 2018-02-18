@@ -65,7 +65,7 @@ function_parameter_decl:
     { Ast.DeclParam {id = $1; ty_spec = $3} |> wrap $startpos $endpos }
 
 function_body:
-    LBLOCK expression RBLOCK { $2 }
+    expression_block { $1 }
 
 type_spec:
     id
@@ -80,6 +80,9 @@ expression_block:
     expression
     RBLOCK
     { Ast.ExprBlock $2 |> wrap $startpos $endpos }
+  | LBLOCK
+    RBLOCK
+    { Ast.ExprBlock (Ast.LitUnit |> wrap $startpos($2) $endpos($2)) |> wrap $startpos $endpos }
 
 expression_if:
     KEYWORD_IF
@@ -96,8 +99,24 @@ expression_if:
 expression_binary:
     expression_binary BIN_OP expression_primary
     { Ast.ExprBinOp {op = $2; lhs = $1; rhs = $3} |> wrap $startpos $endpos }
+  | expression_unary
+    { $1 }
+
+expression_unary:
+    expression_postfix { $1 }
+
+expression_postfix:
+    expression_postfix expression_argument_list
+    { Ast.ExprCall {func = $1; args = $2} |> wrap $startpos $endpos }
+
   | expression_primary
     { $1 }
+
+expression_argument_list:
+    LPAREN
+    separated_list(COMMA, expression)
+    RPAREN
+    { $2 }
 
 expression_primary:
   | LPAREN expression RPAREN { $2 }

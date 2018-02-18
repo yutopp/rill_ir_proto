@@ -10,6 +10,8 @@ type t = {
   mutable errors: Error.t list
 }
 
+exception Escape
+
 let empty () =
   {
     errors = []
@@ -21,7 +23,9 @@ let add_error ctx error =
 let has_errors ctx =
   List.length ctx.errors != 0
 
-let dump_errors ctx =
-  ctx.errors
-  |> List.rev
-  |> List.iter Error.dump
+let get_errors ctx =
+  ctx.errors |> List.rev
+
+let escape_with_error ctx err loc =
+  add_error ctx (err, loc);
+  raise Escape

@@ -32,11 +32,7 @@ module Builtin = struct
     Primitive (Int {bits = 32; signed = true})
 end
 
-let fresh =
-  let id = ref 0 in
-  let f () =
-    let next_id = !id in
-    incr id;
-    Var next_id
-  in
-  f
+let as_func ty =
+  match ty with
+  | Function (params, ret) -> (params, ret)
+  | _ -> failwith "Not function type"
