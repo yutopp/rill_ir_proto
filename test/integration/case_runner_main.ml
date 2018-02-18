@@ -8,12 +8,13 @@
 
 open Batteries
 
-let run_test filename =
+let run_test' filename =
   let open Rill_ir in
   let tree =
-    let t = Syntax.make_ast_from_file filename in
-    assert (Result.is_ok t);
-    Result.get t
+    let res = Syntax.make_ast_from_file filename in
+    match res with
+    | Ok t -> t
+    | Bad e -> raise e
   in
   let () = tree |> Ast.show |> Printf.printf "TREE:\n%s\n" in
 
@@ -45,6 +46,13 @@ let run_test filename =
   let () = m |> Backend.show |> Printf.printf "LLVM: %s\n" in
   let () = Backend.validate m |> Option.may (Printf.printf "%s\n") in
   Ok ()
+
+let run_test filename =
+  let open Rill_ir in
+  try run_test' filename with
+  | Syntax.ParsingError (pos) as e->
+     Printf.printf "%s / %d:%d" filename pos.Lexing.pos_lnum pos.Lexing.pos_bol;
+     Bad e
 
 let () =
   Printexc.record_backtrace true;

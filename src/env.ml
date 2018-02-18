@@ -10,46 +10,19 @@ open Batteries
 
 module StringMap = Map.String
 
-type t = {
-  venv: Type.t StringMap.t;
-  tenv: Type.t StringMap.t;
+type 't t = {
+  table: 't StringMap.t
 }
 
 let empty () =
   {
-    venv = StringMap.empty;
-    tenv = StringMap.empty;
+    table = StringMap.empty;
   }
 
-let add_venv id ty env =
-  { env with
-    venv = StringMap.add id ty env.venv }
+let add id ty env =
+  { table = StringMap.add id ty env.table }
 
-let find_venv id env =
-  match StringMap.find id env.venv with
+let find id env =
+  match StringMap.find id env.table with
   | x -> Some x
   | exception Not_found -> None
-
-let add_tenv id ty env =
-  { env with
-    tenv = StringMap.add id ty env.tenv }
-
-let find_tenv id env =
-  match StringMap.find id env.tenv with
-  | x -> Some x
-  | exception Not_found -> None
-
-let dump env =
-  let s = "venv\n" in
-  let s =
-    StringMap.fold (fun k v s ->
-                    s ^ Printf.sprintf " - '%s':%s\n" k (Type.show v)
-                   ) env.venv s
-  in
-  let s = s ^ "tenv\n" in
-  let s =
-    StringMap.fold (fun k v s ->
-                    s ^ Printf.sprintf " - '%s':%s\n" k (Type.show v)
-                   ) env.tenv s
-  in
-  Printf.printf "%s" s

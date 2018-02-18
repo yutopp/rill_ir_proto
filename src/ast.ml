@@ -16,11 +16,11 @@ type t = {
    | DefFunc of {id: t; params: t list; ret_spec: t; body: t}
    | DeclParam of {id: t; ty_spec: t}
    | TypeSpec of t
+   | ExprSeq of t list
    | ExprIf of {cond: t; then_c: t; else_c: t option}
    | ExprBlock of t
-   | ExprBinOp of {op: string; lhs: t; rhs: t}
+   | ExprBinOp of {op: t; lhs: t; rhs: t}
    | ExprCall of {func: t; args: t list}
-   | Var of t
    | Id of string
    | LitString of string
    | LitInt of {signed: bool; bits: int; value: int}

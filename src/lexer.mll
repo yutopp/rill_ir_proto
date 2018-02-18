@@ -56,6 +56,7 @@ rule token = parse
   | newline             { new_line lexbuf; token lexbuf }
 
   | "//"                { oneline_comment lexbuf }
+  | "/*"                { multiline_comment lexbuf }
 
   | "module"            { KEYWORD_MODULE }
   | "def"               { KEYWORD_DEF }
@@ -77,6 +78,9 @@ rule token = parse
   | id as s             { ID s }
 
   | '+' as op           { BIN_OP (Char.escaped op) }
+  | '-' as op           { BIN_OP (Char.escaped op) }
+  | '*' as op           { BIN_OP (Char.escaped op) }
+  | '/' as op           { BIN_OP (Char.escaped op) }
 
   | '('                 { LPAREN }
   | ')'                 { RPAREN }
@@ -110,3 +114,9 @@ and oneline_comment = parse
   | newline         { new_line lexbuf; token lexbuf }
   | eof             { EOF }
   | _               { oneline_comment lexbuf }
+
+and multiline_comment = parse
+  | "*/"            { token lexbuf }
+  | newline         { new_line lexbuf; multiline_comment lexbuf }
+  | eof             { EOF }
+  | _               { multiline_comment lexbuf }

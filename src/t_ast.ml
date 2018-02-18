@@ -14,15 +14,14 @@ type t = {
  and kind =
    | Module of t list
    | FuncDecl of {name: Id_string.t; params: t list; body: t}
-   | Stmts of {stmts: t list}
+   | ExprSeq of t list
    | Let of {name: Id_string.t; expr: t}
    | Return of t
-   | BinOp of {op: Id_string.t; lhs: t; rhs: t} (* TODO: change to Call *)
    | IfExpr of {cond: t; then_c: t; else_c: t option}
    | ExprCall of {func: t; args: t list}
    | Num of int
    | Unit
    | Bool of bool
-   | Var of Id_string.t
+   | Id of Id_string.t
    | DeclParam of Id_string.t
 [@@deriving show]

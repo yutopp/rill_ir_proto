@@ -180,13 +180,21 @@ and generate_value ~recv_var ctx m env ir_value =
      (* FIX *)
      L.const_int (L.i32_type ctx.llcontext) 0
 
+  (* TODO: FIX *)
   | {kind = Call ("+", [lhs; rhs])} ->
-     (* TODO: FIX *)
      let {ll; sto} = Map.find lhs env in
      let lhs_v = Option.get ll in
      let {ll; sto} = Map.find rhs env in
      let rhs_v = Option.get ll in
      L.build_add lhs_v rhs_v "" ctx.llbuilder
+
+  (* TODO: FIX *)
+  | {kind = Call ("*", [lhs; rhs])} ->
+     let {ll; sto} = Map.find lhs env in
+     let lhs_v = Option.get ll in
+     let {ll; sto} = Map.find rhs env in
+     let rhs_v = Option.get ll in
+     L.build_mul lhs_v rhs_v "" ctx.llbuilder
 
   | {kind = Call (func_name, arg_names)} ->
      Printf.printf "FIND=%s\n" func_name;

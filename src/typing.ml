@@ -9,31 +9,25 @@
 open Batteries
 
 exception Type_mismatch of {expect: Type.t; actual: Type.t}
-exception Type_not_found of string
-exception Variable_not_found of string
+exception Not_found of string
 
 let type_check ~expect ~actual ctx loc =
   if expect <> actual then
     let e = Type_mismatch {expect; actual} in
     Context.escape_with_error ctx e loc
 
-let rec find_type ctx env tree =
+let find ctx env tree =
+  let id_s = Ast.string_of_id tree in
+  match Env.find id_s env with
+  | Some v -> v
+  | None   -> Context.escape_with_error ctx (Not_found id_s) tree.Ast.loc
+
+let rec solve_type ctx env tree =
   match tree with
   | Ast.{kind = TypeSpec id} ->
-     begin
-       let id_s = Ast.string_of_id id in
-       match Env.find_tenv id_s env with
-       | Some ty -> ty
-       | None    -> Context.escape_with_error ctx (Type_not_found id_s) id.Ast.loc
-     end
+     find ctx env id
   | _ ->
      failwith "TYP"
-
-let find_var ctx env tree =
-  let id_s = Ast.string_of_id tree in
-  match Env.find_venv id_s env with
-  | Some v -> v
-  | None   -> Context.escape_with_error ctx (Variable_not_found id_s) tree.Ast.loc
 
 let rec pre_collect_types pre_env tree =
   match tree with
@@ -65,17 +59,17 @@ let rec collect_toplevel_functions ctx env tree =
      let param_tys =
        List.map (function
                   | Ast.{kind = DeclParam {ty_spec}; loc} ->
-                     let ty = find_type ctx env ty_spec in
+                     let ty = solve_type ctx env ty_spec in
                      ty
                   | _ ->
                      failwith "[ICE] not DeclParam"
                 ) params
      in
-     let ret_ty = find_type ctx env ret_spec in
+     let ret_ty = solve_type ctx env ret_spec in
      let func_ty = Type.Function (param_tys, ret_ty) in
 
      let id_s = Ast.string_of_id id in
-     Env.add_venv id_s func_ty env
+     Env.add id_s func_ty env
 
   | _ ->
      failwith "TOP"
@@ -98,7 +92,7 @@ let rec analyze ctx env tree =
   | Ast.{kind = DefFunc {id; params; body}; loc} ->
      let id_s = Ast.string_of_id id in
 
-     let ty = find_var ctx env id in
+     let ty = find ctx env id in
      let (_param_tys, ret_ty) = Type.as_func ty in
 
      let (new_params_rev, env) =
@@ -118,12 +112,22 @@ let rec analyze ctx env tree =
      (T_ast.{kind = FuncDecl {name = id_s; params = new_params; body = ret_body}; ty; loc}, env)
 
   | Ast.{kind = DeclParam {id; ty_spec}; loc} ->
-     let ty = find_type ctx env ty_spec in
+     let ty = solve_type ctx env ty_spec in
 
      let id_s = Ast.string_of_id id in
-     let env = Env.add_venv (Ast.string_of_id id) ty env in
+     let env = Env.add (Ast.string_of_id id) ty env in
 
      (T_ast.{kind = DeclParam id_s; ty; loc}, env)
+
+  | Ast.{kind = ExprSeq exprs; loc} ->
+     let (exprs_rev, env) =
+       List.fold_left (fun (ns, e) expr ->
+                       let (expr', e') = analyze ctx e expr in
+                       (expr' :: ns, e')
+                      ) ([], env) exprs
+     in
+     let ty = (List.hd exprs_rev).T_ast.ty in (* type of the last element *)
+     (T_ast.{kind = ExprSeq (List.rev exprs_rev); ty; loc}, env)
 
   | Ast.{kind = ExprIf {cond; then_c; else_c}; loc} ->
      let (new_cond, env') = analyze ctx env cond in
@@ -144,6 +148,15 @@ let rec analyze ctx env tree =
      (* TODO: add scope *)
      (new_e, env)
 
+  | Ast.{kind = ExprBinOp {op; lhs; rhs}; loc} ->
+     let new_func = analyze ctx env op |> fst in
+     let new_args = [lhs; rhs] |> List.map (analyze ctx env %> fst) in
+
+     let func_ty = new_func.T_ast.ty in
+     let (arg_tys, ret_ty) = Type.as_func func_ty in
+
+     (T_ast.{kind = ExprCall {func = new_func; args = new_args}; ty = ret_ty; loc}, env)
+
   | Ast.{kind = ExprCall {func; args}; loc} ->
      let new_func = analyze ctx env func |> fst in
      let new_args = args |> List.map (analyze ctx env %> fst) in
@@ -151,7 +164,6 @@ let rec analyze ctx env tree =
      let func_ty = new_func.T_ast.ty in
      let (arg_tys, ret_ty) = Type.as_func func_ty in
 
-     (* TODO: unify *)
      (T_ast.{kind = ExprCall {func = new_func; args = new_args}; ty = ret_ty; loc}, env)
 
   | Ast.{kind = LitInt {value; bits; signed}; loc} ->
@@ -162,19 +174,18 @@ let rec analyze ctx env tree =
      let ty = Type.Primitive (Unit) in
      (T_ast.{kind = Unit; ty; loc}, env)
 
-  | Ast.{kind = Var id; loc} ->
-     let id_s = Ast.string_of_id id in
-
-     let ty = find_var ctx env id in
-
-     (T_ast.{kind = Var id_s; ty; loc}, env)
+  | Ast.{kind = Id id_s; loc} as id ->
+     let ty = find ctx env id in
+     (T_ast.{kind = Id id_s; ty; loc}, env)
 
   | _ ->
      failwith (Printf.sprintf "ANALYZER: %s" (Ast.show tree))
 
 let add_primitive_types env =
-  let env = Env.add_tenv "unit" Type.Builtin.unit env in
-  let env = Env.add_tenv "i32" Type.Builtin.i32 env in
+  let env = Env.add "+" (Type.Function ([Type.Builtin.i32; Type.Builtin.i32], Type.Builtin.i32)) env in
+  let env = Env.add "*" (Type.Function ([Type.Builtin.i32; Type.Builtin.i32], Type.Builtin.i32)) env in
+  let env = Env.add "unit" Type.Builtin.unit env in
+  let env = Env.add "i32" Type.Builtin.i32 env in
   env
 
 let rec generate ctx env tree =

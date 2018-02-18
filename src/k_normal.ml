@@ -52,12 +52,8 @@ let rec generate env ast =
      k (fun e' ->
         {kind = Return e'; ty; loc})
 
-  | T_ast.{kind = BinOp {op; lhs; rhs}; ty; loc} ->
-     let k = insert_let (generate env lhs) in
-     k (fun lhs' ->
-        let k = insert_let (generate env rhs) in
-        k (fun rhs' ->
-           {kind = Call {name = op; args = [lhs'; rhs']}; ty; loc}))
+  | T_ast.{kind = ExprSeq exprs; ty; loc} ->
+     {kind = Seq {nodes = (List.map (generate env) exprs)}; ty; loc}
 
   | T_ast.{kind = IfExpr {cond; then_c; else_c}; ty; loc} ->
      let unit_imm = Type.Builtin.unit in
@@ -82,7 +78,7 @@ let rec generate env ast =
            {kind = Seq {nodes = [if_stmt; var]}; ty; loc}
           ))
 
-  | T_ast.{kind = ExprCall {func = T_ast.{kind = Var f}; args}; ty; loc} ->
+  | T_ast.{kind = ExprCall {func = T_ast.{kind = Id f}; args}; ty; loc} ->
      let rec bind xs args =
        match args with
        | [] -> {kind= Call {name=f; args = List.rev xs}; ty; loc}
@@ -95,7 +91,7 @@ let rec generate env ast =
   | T_ast.{kind = ExprCall {func; args}; ty; loc} ->
      failwith ""
 
-  | T_ast.{kind = Var x; ty; loc} ->
+  | T_ast.{kind = Id x; ty; loc} ->
      {kind = Var x; ty; loc}
 
   | T_ast.{kind = Num n; ty; loc} ->

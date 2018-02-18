@@ -77,6 +77,10 @@ type_spec:
     { Ast.TypeSpec $1 |> wrap $startpos $endpos }
 
 expression:
+    separated_nonempty_list(SEMICOLON, expression_cond)
+    { Ast.ExprSeq $1 |> wrap $startpos $endpos }
+
+expression_cond:
     expression_if { $1 }
   | expression_binary { $1 }
 
@@ -102,7 +106,7 @@ expression_if:
     { Ast.ExprIf {cond = cond_e; then_c = then_e; else_c = Some else_e} |> wrap $startpos $endpos }
 
 expression_binary:
-    expression_binary BIN_OP expression_primary
+    expression_binary id_binary_op expression_primary
     { Ast.ExprBinOp {op = $2; lhs = $1; rhs = $3} |> wrap $startpos $endpos }
   | expression_unary
     { $1 }
@@ -129,10 +133,14 @@ expression_primary:
   | lit_int { $1 }
   | lit_bool { $1 }
   | lit_unit { $1 }
-  | id { Ast.Var $1 |> wrap $startpos $endpos }
+  | id { $1 }
 
 id:
     ID
+    { Ast.Id $1 |> wrap $startpos $endpos}
+
+id_binary_op:
+    BIN_OP
     { Ast.Id $1 |> wrap $startpos $endpos}
 
 lit_string:
