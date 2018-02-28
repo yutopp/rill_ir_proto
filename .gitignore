@@ -2,3 +2,11 @@
 
 # OCaml files
 _build/
+
+# generated files
+*.ll
+*.out
+*.s
+
+# adhoc files
+SPEC.md

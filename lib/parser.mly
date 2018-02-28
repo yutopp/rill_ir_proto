@@ -77,11 +77,17 @@ type_spec:
     { Ast.TypeSpec $1 |> wrap $startpos $endpos }
 
 expression:
-    separated_nonempty_list(SEMICOLON, expression_cond)
+    separated_nonempty_list(SEMICOLON, expression_let)
     { Ast.ExprSeq $1 |> wrap $startpos $endpos }
 
+expression_let:
+    KEYWORD_LET id EQ expression_cond
+    { Ast.ExprLet {id = $2; expr = $4} |> wrap $startpos $endpos }
+  | expression_cond
+    { $1 }
+
 expression_cond:
-    expression_if { $1 }
+    expression_if     { $1 }
   | expression_binary { $1 }
 
 expression_block:
@@ -140,8 +146,8 @@ id:
     { Ast.Id $1 |> wrap $startpos $endpos}
 
 id_binary_op:
-    BIN_OP
-    { Ast.Id $1 |> wrap $startpos $endpos}
+    BIN_OP { Ast.Id $1 |> wrap $startpos $endpos}
+  | EQ     { Ast.Id "=" |> wrap $startpos $endpos}
 
 lit_string:
     STRING

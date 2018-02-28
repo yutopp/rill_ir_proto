@@ -77,6 +77,7 @@ rule token = parse
 
   | id as s             { ID s }
 
+  | '='                 { EQ }
   | '+' as op           { BIN_OP (Char.escaped op) }
   | '-' as op           { BIN_OP (Char.escaped op) }
   | '*' as op           { BIN_OP (Char.escaped op) }

@@ -21,6 +21,10 @@ lib: [
   "_build/install/default/lib/rill_ir/rill_ir__Error.cmx"
   "_build/install/default/lib/rill_ir/rill_ir__Error.cmt"
   "_build/install/default/lib/rill_ir/error.ml"
+  "_build/install/default/lib/rill_ir/rill_ir__Error_msg.cmi"
+  "_build/install/default/lib/rill_ir/rill_ir__Error_msg.cmx"
+  "_build/install/default/lib/rill_ir/rill_ir__Error_msg.cmt"
+  "_build/install/default/lib/rill_ir/error_msg.ml"
   "_build/install/default/lib/rill_ir/rill_ir__Id_string.cmi"
   "_build/install/default/lib/rill_ir/rill_ir__Id_string.cmx"
   "_build/install/default/lib/rill_ir/rill_ir__Id_string.cmt"
@@ -67,6 +71,10 @@ lib: [
   "_build/install/default/lib/rill_ir/rill_ir__Type.cmx"
   "_build/install/default/lib/rill_ir/rill_ir__Type.cmt"
   "_build/install/default/lib/rill_ir/type.ml"
+  "_build/install/default/lib/rill_ir/rill_ir__Type_check.cmi"
+  "_build/install/default/lib/rill_ir/rill_ir__Type_check.cmx"
+  "_build/install/default/lib/rill_ir/rill_ir__Type_check.cmt"
+  "_build/install/default/lib/rill_ir/type_check.ml"
   "_build/install/default/lib/rill_ir/rill_ir__Typing.cmi"
   "_build/install/default/lib/rill_ir/rill_ir__Typing.cmx"
   "_build/install/default/lib/rill_ir/rill_ir__Typing.cmt"
@@ -75,6 +83,9 @@ lib: [
   "_build/install/default/lib/rill_ir/rill_ir.cmxa"
   "_build/install/default/lib/rill_ir/rill_ir.a"
   "_build/install/default/lib/rill_ir/rill_ir.cmxs"
+]
+bin: [
+  "_build/install/default/bin/rillirc" {"rillirc"}
 ]
 doc: [
   "_build/install/default/doc/rill_ir/README.md"

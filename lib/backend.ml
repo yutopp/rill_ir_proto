@@ -26,6 +26,7 @@ let initialize_backends =
     match !is_initialized with
     | false ->
        Llvm_all_backends.initialize ();
+
        is_initialized := true
     | true ->
        ()
@@ -181,6 +182,14 @@ and generate_value ~recv_var ctx m env ir_value =
      L.const_int (L.i32_type ctx.llcontext) 0
 
   (* TODO: FIX *)
+  | {kind = Call ("=", [lhs; rhs])} ->
+     let {ll; sto} = Map.find lhs env in
+     let lhs_v = Option.get ll in
+     let {ll; sto} = Map.find rhs env in
+     let rhs_v = Option.get ll in
+     L.build_add lhs_v rhs_v "" ctx.llbuilder
+
+  (* TODO: FIX *)
   | {kind = Call ("+", [lhs; rhs])} ->
      let {ll; sto} = Map.find lhs env in
      let lhs_v = Option.get ll in
@@ -283,3 +292,7 @@ let show m =
 let validate m =
   let {llmodule} = m in
   Llvm_analysis.verify_module llmodule
+
+let emit_file ctx m out_path =
+  let ll = show m in
+  File.with_file_out out_path (fun f -> IO.write_string f ll)

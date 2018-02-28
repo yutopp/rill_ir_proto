@@ -8,25 +8,31 @@
 
 open Batteries
 
+exception ErrorMsg of string
+
 let run_test' filename =
   let open Rill_ir in
   let tree =
     let res = Syntax.make_ast_from_file filename in
     match res with
-    | Ok t -> t
-    | Bad e -> raise e
+    | Ok t ->
+       t
+    | Bad (Syntax.ParsingError pos) ->
+       raise (ErrorMsg (Printf.sprintf "Syntax Error: %d:%d" pos.Lexing.pos_lnum pos.Lexing.pos_bol))
+    | Bad e ->
+       raise e
   in
-  let () = tree |> Ast.show |> Printf.printf "TREE:\n%s\n" in
+  (*let () = tree |> Ast.show |> Printf.printf "TREE:\n%s\n" in*)
 
   let ctx = Context.empty () in
   let env = Env.empty () in
   let (typed_tree, env) = Typing.generate ctx env tree in
-  let () = typed_tree |> T_ast.show |> Printf.printf "TYPED TREE:\n%s\n" in
+  (*let () = typed_tree |> T_ast.show |> Printf.printf "TYPED TREE:\n%s\n" in*)
   Context.get_errors ctx |> List.map Error_msg.to_msg |> List.iter (Printf.printf "%s\n");
   assert (not (Context.has_errors ctx));
-
+  let _ = Type_check.check typed_tree in
   let k_form = typed_tree |> K_normal.generate env in
-  let () = k_form |> K_normal.show |> Printf.printf "K NORMAL:\n%s\n" in
+  (*let () = k_form |> K_normal.show |> Printf.printf "K NORMAL:\n%s\n" in*)
 
   let ir_ctx = Ir.make_context () in
   let rill_module = k_form |> Ir.generate ir_ctx env in
@@ -45,13 +51,19 @@ let run_test' filename =
   let m = rill_module |> Backend.generate backend_ctx in
   let () = m |> Backend.show |> Printf.printf "LLVM: %s\n" in
   let () = Backend.validate m |> Option.may (Printf.printf "%s\n") in
+
   Ok ()
 
-let run_test filename =
+let run_test index filename =
   let open Rill_ir in
+  Printf.printf "[%d] ========== \n" index;
+  Printf.printf "CASE: %s\n" filename;
+
   try run_test' filename with
-  | Syntax.ParsingError (pos) as e->
-     Printf.printf "%s / %d:%d" filename pos.Lexing.pos_lnum pos.Lexing.pos_bol;
+  | ErrorMsg msg as e ->
+     Printf.printf " = ERROR %s\n" msg;
+     Bad e
+  | e ->
      Bad e
 
 let () =
@@ -66,6 +78,6 @@ let () =
     |> List.sort compare
   in
 
-  let results = files |> List.map run_test in
+  let results = files |> List.mapi run_test in
 
   ()

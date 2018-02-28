@@ -17,6 +17,7 @@ type t = {
    | DeclParam of {id: t; ty_spec: t}
    | TypeSpec of t
    | ExprSeq of t list
+   | ExprLet of {id: t; expr: t}
    | ExprIf of {cond: t; then_c: t; else_c: t option}
    | ExprBlock of t
    | ExprBinOp of {op: t; lhs: t; rhs: t}

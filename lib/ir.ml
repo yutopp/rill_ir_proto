@@ -495,6 +495,17 @@ and collect_stack_pass' ctx env ir =
   | _ ->
      failwith ""
 
+let apply_pass ?(tap=fun _ -> ()) ctx env m =
+  let passes = [complete_pass; reduce_tmp_vars_pass; collect_stack_pass] in
+  let m =
+    List.fold_left (fun m pass ->
+                    let m' = pass ctx env m in
+                    tap m';
+                    m'
+                   ) m passes
+  in
+  m
+
 let rec show ir =
   let buf = Buffer.create 0 in
   let () = show_impl buf 0 ir in

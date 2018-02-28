@@ -16,6 +16,7 @@
 %token                  KEYWORD_TRUE KEYWORD_FALSE
 %token                  LPAREN RPAREN
 %token                  LBLOCK RBLOCK
+%token                  EQ
 %token                  COMMA COLON SEMICOLON
 %token                  EOF
 

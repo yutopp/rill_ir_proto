@@ -115,7 +115,7 @@ let rec analyze ctx env tree =
      let ty = solve_type ctx env ty_spec in
 
      let id_s = Ast.string_of_id id in
-     let env = Env.add (Ast.string_of_id id) ty env in
+     let env = Env.add id_s ty env in
 
      (T_ast.{kind = DeclParam id_s; ty; loc}, env)
 
@@ -128,6 +128,15 @@ let rec analyze ctx env tree =
      in
      let ty = (List.hd exprs_rev).T_ast.ty in (* type of the last element *)
      (T_ast.{kind = ExprSeq (List.rev exprs_rev); ty; loc}, env)
+
+  | Ast.{kind = ExprLet {id; expr}; loc} ->
+     let (new_expr, env') = analyze ctx env expr in
+
+     let id_s = Ast.string_of_id id in
+     let env = Env.add id_s (new_expr.T_ast.ty) env in
+
+     let ty = Type.Primitive (Unit) in
+     (T_ast.{kind = Let {name = id_s; expr = new_expr}; ty; loc}, env)
 
   | Ast.{kind = ExprIf {cond; then_c; else_c}; loc} ->
      let (new_cond, env') = analyze ctx env cond in
@@ -182,6 +191,10 @@ let rec analyze ctx env tree =
      failwith (Printf.sprintf "ANALYZER: %s" (Ast.show tree))
 
 let add_primitive_types env =
+  let env =
+    let ty_a = Type.fresh () in
+    Env.add "=" (Type.Function ([ty_a; ty_a], ty_a)) env
+  in
   let env = Env.add "+" (Type.Function ([Type.Builtin.i32; Type.Builtin.i32], Type.Builtin.i32)) env in
   let env = Env.add "*" (Type.Function ([Type.Builtin.i32; Type.Builtin.i32], Type.Builtin.i32)) env in
   let env = Env.add "unit" Type.Builtin.unit env in
