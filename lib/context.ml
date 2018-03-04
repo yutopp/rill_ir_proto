@@ -17,8 +17,9 @@ let empty () =
     errors = []
   }
 
-let add_error ctx error =
-  ctx.errors <- error :: ctx.errors
+let add_error ctx kind loc =
+  let err = (kind, loc) in
+  ctx.errors <- err :: ctx.errors
 
 let has_errors ctx =
   List.length ctx.errors != 0
@@ -26,6 +27,6 @@ let has_errors ctx =
 let get_errors ctx =
   ctx.errors |> List.rev
 
-let escape_with_error ctx err loc =
-  add_error ctx (err, loc);
+let escape_with_error ctx kind loc =
+  add_error ctx kind loc;
   raise Escape

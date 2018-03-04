@@ -9,43 +9,54 @@
 open Batteries
 
 module Compiler = struct
+  module Env = Rill_ir.Frontend_env
+
+  type t = {
+    diagnostics: Rill_ir.Error.t list;
+  }
+
+  let is_succeeded result =
+    List.length result.diagnostics = 0
+
   let compile_file in_path out_path =
     let open Rill_ir in
     Printf.printf "compile_file %s -> %s\n" in_path out_path;
-    let res = Syntax.make_ast_from_file in_path in
+    let ctx = Context.empty () in
+
+    let res = Syntax.make_ast_from_file ctx in_path in
     match res with
-    | Ok tree ->
-       let ctx = Context.empty () in
+    | Some tree ->
+       let () = tree |> Ast.show |> Printf.printf "TREE:\n%s\n" in
+
        let env = Env.empty () in
        let (typed_tree, env) = Typing.generate ctx env tree in
+       let () = typed_tree |> T_ast.show |> Printf.printf "TYPED TREE:\n%s\n" in
+
        begin
          match Context.get_errors ctx with
          | [] ->
-            let k_form = typed_tree |> K_normal.generate env in
-            let ir_ctx = Ir.make_context () in
-
-            let p m =
-              m |> Ir.show |> Printf.printf "IR: %s\n"
-            in
-            let rill_module = k_form |> Ir.generate ir_ctx env in
-            let () = rill_module |> p in
-
-            let rill_module = rill_module |> Ir.apply_pass ~tap:p ir_ctx env in
+            let mm = Builder.build typed_tree in
 
             let backend_ctx = Backend.make_context () in
-            let m = rill_module |> Backend.generate backend_ctx in
+            let m = Backend.generate backend_ctx mm in
             let () = m |> Backend.show |> Printf.printf "LLVM:\n%s\n" in
             let () = Backend.validate m |> Option.may (Printf.printf "%s\n") in
 
             let () = Backend.emit_file backend_ctx m out_path in
 
-            Ok ()
+            {
+              diagnostics = []
+            }
          | errors ->
-            errors |> List.map Error_msg.to_msg |> List.iter (Printf.printf "%s\n");
-            Ok ()
+            {
+              diagnostics = errors
+            }
        end
-    | Bad e ->
-       Bad e
+    | None ->
+       let errs = Context.get_errors ctx in
+       {
+         diagnostics = errs
+       }
 end
 
 let build co =
@@ -59,8 +70,8 @@ let build co =
        let p = co.Args.output_file |> Option.default in_path in
        Filetype.convert_path (Filetype.Llvm L_asm) p
      in
-     let _ = Compiler.compile_file in_path out_path in
-     ()
+     let result = Compiler.compile_file in_path out_path in
+     [result]
 
   | false ->
      let inout_paths =
@@ -73,16 +84,20 @@ let build co =
        inout_paths
        |> List.map (fun (in_path, out_path) -> Compiler.compile_file in_path out_path)
      in
-     ()
-
-let is_successful res =
-  true
+     results
 
 let () =
+  Printexc.record_backtrace true;
+
   let co = Args.parse () in
-  let res = build co in
-  match is_successful res with
+  let results = build co in
+  match List.for_all Compiler.is_succeeded results with
   | true ->
      exit 0
   | false ->
+     List.iter (fun result ->
+                List.iter (fun diagnostics ->
+                           Printf.printf "%s\n" (Rill_ir.Error_msg.to_msg diagnostics)
+                          ) result.Compiler.diagnostics
+               ) (results |> List.filter (Compiler.is_succeeded %> not));
      exit 1

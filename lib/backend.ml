@@ -36,16 +36,16 @@ let initialize_backends =
 let is_stack_type ty =
   false
 
-let rec ll_of_ty ctx ty =
+let rec to_lltype ctx m ty =
   let llctx = ctx.llcontext in
-  match ty with
-  | Type.Primitive (Int {bits}) ->
+  match ty.Mir.Type_ref.state with
+  | Mir.Type_ref.Complete (Mir.Type_ref.Primitive (Mir.Type_ref.Int {bits})) ->
      L.integer_type llctx bits
-  | Type.Primitive Unit ->
+  | Mir.Type_ref.Complete (Mir.Type_ref.Primitive Mir.Type_ref.Unit) ->
      L.void_type llctx
-  | Type.Function (param_tys, ret_ty) ->
-     let param_ll_tys = param_tys |> List.map (ll_of_ty ctx) in
-     let ret_ll_ty = ret_ty |> ll_of_ty ctx in
+  | Mir.Type_ref.Complete (Mir.Type_ref.Function (param_tys, ret_ty)) ->
+     let param_ll_tys = param_tys |> List.map (to_lltype ctx m) in
+     let ret_ll_ty = ret_ty |> to_lltype ctx m in
      L.function_type ret_ll_ty (param_ll_tys |> Array.of_list)
   | _ ->
      failwith "[ICE] not supported type"
@@ -60,45 +60,94 @@ let make_context () =
     llbuilder = builder;
   }
 
-let rec generate ctx ir_module =
-  let name = "Rill" in      (* TODO: change to ir_module name *)
-  let m = L.create_module ctx.llcontext name in
-  let Ir.{functions} = ir_module in
+let rec generate_type ctx m name ty llmod parent_llty_opt =
+  ()
 
-  let env =
-    List.fold_left (fun e g ->
-                    generate_global_interfaces ctx m e g
-                   ) Map.empty functions
+let generate_static_proto ctx m name v llmod parent_llty_opt =
+  match v.Mir.Var_ref.kind with
+  | Mir.Var_ref.Undefined ->
+     failwith "[ICE] still unknown"
+
+  | Mir.Var_ref.Expr {kind = Mir.Ast.ExprFunc _; ty; loc} ->
+     let fty = to_lltype ctx m ty in
+     let _llfv = L.declare_function name fty llmod in
+     ()
+
+  | Mir.Var_ref.Expr e ->
+     failwith "not supported yet"
+
+let rec generate_static ctx m name v llmod parent_llty_opt =
+  match v.Mir.Var_ref.kind with
+  | Mir.Var_ref.Undefined ->
+     failwith "[ICE] still unknown"
+
+  | Mir.Var_ref.Expr ({kind = Mir.Ast.ExprFunc _; ty; loc} as e) ->
+     let env = Frontend_env.empty () in
+     let k = K_normal.generate env e in
+
+     let passes = [
+       Ir.complete_pass';
+       Ir.reduce_tmp_vars_pass';
+       Ir.collect_stack_pass'
+     ] in
+
+     let ir_ctx = Ir.make_context () in
+     let ir =
+       let base = Ir.generate' ir_ctx env k in
+       let () = base |> Ir.show_value |> Printf.printf "IR0: %s\n" in
+       List.fold_left (fun e pass ->
+                       let e' = pass ir_ctx env e in
+                       let () = e' |> Ir.show_value |> Printf.printf "IRN: %s\n" in
+                       e'
+                      ) base passes
+     in
+     flush_all ();
+
+     let env = Map.empty in
+     let _ = generate_value ~recv_var:name ctx llmod env ir in
+     ()
+
+  | Mir.Var_ref.Expr _ ->
+     failwith "not supported yet"
+
+and generate ctx m =
+  let name = "Rill" in (* TODO: change to ir_module name *)
+  let llmod = L.create_module ctx.llcontext name in
+
+  let () =
+    let build name t =
+      generate_type ctx m name t llmod None
+    in
+    Hashtbl.iter build m.Mir.tenv
   in
-  List.iter (fun f ->
-             generate_value ~recv_var:"" ctx m env f |> ignore
-            ) functions;
+
+  let () =
+    let build name v =
+      generate_static_proto ctx m name v llmod None
+    in
+    Hashtbl.iter build m.Mir.venv
+  in
+
+  let () =
+    let build name v =
+      generate_static ctx m name v llmod None
+    in
+    Hashtbl.iter build m.Mir.venv
+  in
+
   {
-    llmodule = m
+    llmodule = llmod;
   }
 
-and generate_global_interfaces ctx m env ir_value =
-  let open Ir in
-  match ir_value with
-  | {kind = Function ({name; params; _}, _vars); ty} ->
-     Printf.printf "FUNC=%s\n" name;
-     let fty = ll_of_ty ctx ty in
-
-     let f = L.declare_function name fty m in
-     List.iter2 L.set_value_name params (L.params f |> Array.to_list);
-
-     let ev = {ll = Some f; sto = StoImm} in
-     Map.add name ev env
-
-  | _ ->
-     env
-
-and generate_value ~recv_var ctx m env ir_value =
+and generate_value ~recv_var ctx llmod env ir_value =
   let open Ir in
   match ir_value with
   | {kind = Function ({name; params; basic_blocks; _}, vars)} ->
-     let {ll; sto} = Map.find name env in
-     let f = Option.get ll in
+     let f = L.lookup_function recv_var llmod |> Option.get in
+     let () =
+       List.iter2 L.set_value_name params (L.params f |> Array.to_list);
+     in
+
      let env =
        List.fold_lefti (fun e index p ->
                         let llp = L.param f index in
@@ -115,7 +164,7 @@ and generate_value ~recv_var ctx m env ir_value =
        VarsMap.fold
          (fun k v acc ->
           let storage = match v with
-            | (Type.Primitive Unit, _) -> StoIgnore (* unit will not be exported to executable *)
+            | (Mir.Type_ref.{state = Complete (Primitive Unit)}, _) -> StoIgnore (* unit will not be exported to executable *)
             | (_, Ir.MutVar) -> StoStack
             | (ty, Ir.MutImm) when is_stack_type ty -> StoStack
             | (_ , Ir.MutImm) -> StoImm
@@ -123,7 +172,7 @@ and generate_value ~recv_var ctx m env ir_value =
           Printf.printf "VAR %s, storage=%s\n" k (show_storage_t storage);
           let ev = match storage with
             | StoStack ->
-               let llty = L.i32_type ctx.llcontext in
+               let llty = L.i32_type ctx.llcontext in (* TODO fix *)
                let llv = L.build_alloca llty k ctx.llbuilder in
                {ll = Some llv; sto = storage}
             | _ ->
@@ -160,22 +209,24 @@ and generate_value ~recv_var ctx m env ir_value =
           let next_e =
             Vect.fold_left
               (fun e i ->
-               match generate_inst ctx m e i with
+               match generate_inst ctx llmod e i with
                | Some (_, ne) -> ne
                | None -> e
               ) e insts
           in
           Option.may (fun t ->
-                      generater_terminator ctx m next_e bb_env t |> ignore
+                      generater_terminator ctx llmod next_e bb_env t |> ignore
                      ) terminator;
 
           next_e
          ) env basic_blocks
      in
+     L.dump_value f;
+     flush_all ();
      f
 
   | {kind = IntValue v; ty} ->
-     L.const_int (ll_of_ty ctx ty) v
+     L.const_int (to_lltype ctx llmod ty) v
 
   | {kind = UndefValue} ->
      (* FIX *)
@@ -207,10 +258,16 @@ and generate_value ~recv_var ctx m env ir_value =
 
   | {kind = Call (func_name, arg_names)} ->
      Printf.printf "FIND=%s\n" func_name;
-     let {ll; sto} = Map.find func_name env in
-     let lhs_v = Option.get ll in
+     let f = L.lookup_function func_name llmod |> Option.get in
 
-     L.build_call lhs_v [||] "" ctx.llbuilder
+     let args =
+       arg_names
+       |> List.map (fun n -> Map.find n env)
+       |> List.map (fun {ll; sto} -> Option.get ll)
+       |> Array.of_list
+     in
+
+     L.build_call f args "" ctx.llbuilder
 
   | {kind = Var (var_name)} ->
      let {ll; sto} = Map.find var_name env in

@@ -11,8 +11,8 @@ type basic_block_t = {
   mutable insts: inst_t Vect.t;
   mutable terminator: terminator_t option;
 }
- and vars_t = (Type.t * mut) VarsMap.t
- and value_t = {kind: value_kind_t; ty: Type.t}
+ and vars_t = (Mir.Type_ref.t * mut) VarsMap.t
+ and value_t = {kind: value_kind_t; ty: Mir.Type_ref.t}
  and value_kind_t =
    | Function of function_t * vars_t
    | IntValue of int
@@ -121,15 +121,18 @@ let current_function ctx =
   | Some _ -> failwith "not a function value"
   | None   -> failwith "there is no current function"
 
-let current_module ctx =
-  match ctx.current_module with
-  | Some m -> m
-  | None   -> failwith "there is no current module"
-
-
-let declare_function m name params ty =
+let create_function params ty =
   let f = {
-    name = name;
+    name = "";
+    params = params;
+    bb_index = 0;
+    basic_blocks = Vect.empty;
+  } in
+  {kind = Function (f, VarsMap.empty); ty}
+
+let declare_function m params ty =
+  let f = {
+    name = "";
     params = params;
     bb_index = 0;
     basic_blocks = Vect.empty;
@@ -225,14 +228,8 @@ let rec generate ctx env k_form =
 
 and generate' ctx env k_form =
   match k_form with
-  | K_normal.{kind = FuncDecl {name; params; body}; ty; loc} ->
-     let param_names =
-       List.map (function
-                  | K_normal.{kind = DeclParam s} -> s
-                  | _ -> failwith "[ICE]"
-                ) params
-     in
-     let fv = declare_function (current_module ctx) name param_names ty in
+  | K_normal.{kind = ExprFunc {params; body}; ty; loc} ->
+     let fv = create_function params ty in
      let () = set_current_function ctx fv in
      let _entry = append_block ctx "" in
      let _ = generate' ctx env body in
@@ -240,8 +237,7 @@ and generate' ctx env k_form =
 
   | K_normal.{kind = Seq {nodes}; ty; loc} ->
      let base =
-       let unit_imm = Type.Builtin.unit in
-       {kind = Unit; ty = unit_imm}
+       {kind = Unit; ty = Mir.Type_ref.Builtin.never}
      in
      List.fold_left (fun acc n ->
                      generate' ctx env n
@@ -283,13 +279,11 @@ and generate' ctx env k_form =
 
      let () = set_current_bb ctx term_bb in
 
-     let unit_imm = Type.Builtin.unit in
-     {kind = Unit; ty = unit_imm}
+     {kind = Unit; ty = Mir.Type_ref.Builtin.unit}
 
   | K_normal.{kind = Return e; loc} ->
      let _ = build_ret ctx e in
-     let unit_imm = Type.Builtin.unit in
-     {kind = Unit; ty = unit_imm}
+     {kind = Unit; ty = Mir.Type_ref.Builtin.unit}
 
   | K_normal.{kind = Var name; ty; loc} ->
      {kind = Var name; ty}
@@ -511,6 +505,11 @@ let rec show ir =
   let () = show_impl buf 0 ir in
   Buffer.contents buf
 
+and show_value ir_value =
+  let buf = Buffer.create 0 in
+  let () = show_value_impl buf 0 ir_value in
+  Buffer.contents buf
+
 and show_impl buf i m =
   let p ?(i=i) fmt = Format.bprintf buf ("%s" ^^ fmt) (String.repeat " " (i*2)) in
   p "Module\n";
@@ -562,7 +561,7 @@ and show_inst_impl buf i inst =
   let p ?(i=i) fmt = Format.bprintf buf ("%s" ^^ fmt) (String.repeat " " (i*2)) in
   match inst with
   | Let (name, value) ->
-     p "Let %s: %s = " name (Type.show value.ty);
+     p "Let %s: %s = " name (Mir.Type_ref.show value.ty);
      show_value_impl buf 0 value;
      Format.bprintf buf (";\n")
   | Assign (name, value) ->

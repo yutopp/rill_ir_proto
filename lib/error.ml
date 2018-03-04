@@ -6,4 +6,9 @@
  * http://www.boost.org/LICENSE_1_0.txt)
  *)
 
-type t = (exn * Loc.t)
+type t = (kind * Loc.t)
+and kind =
+  | Lexing_error of Lexer.error_kind
+  | Parsing_error
+  | Not_found of string
+  | Type_mismatch of {expect: Type.t; actual: Type.t}

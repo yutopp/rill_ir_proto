@@ -9,20 +9,8 @@
 %start <Ast.t> program_entry
 
 %{
-  let to_loc spos epos =
-    let open Lexing in
-    let p = Loc.{
-      pos_begin_cnum = spos.pos_cnum;
-      pos_begin_lnum = spos.pos_lnum;
-      pos_begin_bol  = spos.pos_cnum - spos.pos_bol;
-      pos_end_cnum   = epos.pos_cnum;
-      pos_end_lnum   = epos.pos_lnum;
-      pos_end_bol    = epos.pos_cnum - epos.pos_bol;
-    } in
-    Some p
-
   let wrap spos epos kind =
-    let loc = to_loc spos epos in
+    let loc = Loc.from_pos spos epos in
     Ast.{kind; loc}
 %}
 
@@ -67,7 +55,7 @@ function_parameter_decl:
 
 function_ret_type:
     { Ast.TypeSpec (Ast.Id "unit" |> wrap $startpos $endpos) |> wrap $startpos $endpos }
-  | type_spec { $1 }
+  | COLON type_spec { $2 }
 
 function_body:
     expression_block { $1 }
@@ -112,7 +100,7 @@ expression_if:
     { Ast.ExprIf {cond = cond_e; then_c = then_e; else_c = Some else_e} |> wrap $startpos $endpos }
 
 expression_binary:
-    expression_binary id_binary_op expression_primary
+    expression_binary id_binary_op expression_unary
     { Ast.ExprBinOp {op = $2; lhs = $1; rhs = $3} |> wrap $startpos $endpos }
   | expression_unary
     { $1 }

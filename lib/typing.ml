@@ -8,19 +8,18 @@
 
 open Batteries
 
-exception Type_mismatch of {expect: Type.t; actual: Type.t}
-exception Not_found of string
+module Env = Frontend_env
 
 let type_check ~expect ~actual ctx loc =
   if expect <> actual then
-    let e = Type_mismatch {expect; actual} in
+    let e = Error.Type_mismatch {expect; actual} in
     Context.escape_with_error ctx e loc
 
 let find ctx env tree =
   let id_s = Ast.string_of_id tree in
   match Env.find id_s env with
   | Some v -> v
-  | None   -> Context.escape_with_error ctx (Not_found id_s) tree.Ast.loc
+  | None   -> Context.escape_with_error ctx (Error.Not_found id_s) tree.Ast.loc
 
 let rec solve_type ctx env tree =
   match tree with
